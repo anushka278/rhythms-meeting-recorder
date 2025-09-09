@@ -47,5 +47,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveAsPDF: (data) => ipcRenderer.invoke('saveAsPDF', data),
   
   // Chat APIs
-  chatWithOpenAI: (message, noteContent) => ipcRenderer.invoke('chatWithOpenAI', message, noteContent)
+  chatWithOpenAI: (message, noteContent) => ipcRenderer.invoke('chatWithOpenAI', message, noteContent),
+  chatWithAllNotes: (message) => ipcRenderer.invoke('chatWithAllNotes', message)
 });

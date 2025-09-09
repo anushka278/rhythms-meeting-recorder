@@ -2635,6 +2635,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize chat functionality
   initChatFunctionality();
   initChatModal();
+  initUniversalChat();
 
 });
 
@@ -2830,6 +2831,102 @@ function initChatModal() {
       const prompt = button.getAttribute('data-prompt');
       if (prompt) {
         sendMessageModal(prompt);
+      }
+    });
+  });
+}
+
+// Universal Chat functionality
+function initUniversalChat() {
+  const universalChatBtn = document.getElementById('universalChatBtn');
+  const universalChatModal = document.getElementById('universalChatModal');
+  const universalChatClose = document.getElementById('universalChatClose');
+  const universalChatInput = document.getElementById('universalChatInput');
+  const universalChatSend = document.getElementById('universalChatSend');
+  const universalChatMessages = document.getElementById('universalChatMessages');
+  const universalChatQuickBtns = document.querySelectorAll('.universal-chat-quick-btn');
+
+  // Open universal chat modal
+  universalChatBtn.addEventListener('click', () => {
+    universalChatModal.style.display = 'flex';
+    universalChatInput.focus();
+  });
+
+  // Close universal chat modal
+  universalChatClose.addEventListener('click', () => {
+    universalChatModal.style.display = 'none';
+  });
+
+  // Close on backdrop click
+  universalChatModal.addEventListener('click', (e) => {
+    if (e.target === universalChatModal) {
+      universalChatModal.style.display = 'none';
+    }
+  });
+
+  // Add message to universal chat
+  function addUniversalMessage(content, isUser = true) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `universal-chat-message ${isUser ? 'user' : 'assistant'}`;
+    messageDiv.textContent = content;
+    universalChatMessages.appendChild(messageDiv);
+    universalChatMessages.scrollTop = universalChatMessages.scrollHeight;
+  }
+
+  // Send message to universal chat
+  async function sendUniversalMessage(message) {
+    try {
+      addUniversalMessage(message, true);
+      
+      // Show loading indicator
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'universal-chat-message assistant';
+      loadingDiv.textContent = 'Thinking...';
+      universalChatMessages.appendChild(loadingDiv);
+      universalChatMessages.scrollTop = universalChatMessages.scrollHeight;
+      
+      // Call universal chat API
+      const response = await window.electronAPI.chatWithAllNotes(message);
+      
+      // Remove loading indicator
+      universalChatMessages.removeChild(loadingDiv);
+      
+      // Add assistant response
+      addUniversalMessage(response, false);
+      
+    } catch (error) {
+      console.error('Error in universal chat:', error);
+      // Remove loading indicator if it exists
+      const loadingDiv = universalChatMessages.querySelector('.universal-chat-message.assistant:last-child');
+      if (loadingDiv && loadingDiv.textContent === 'Thinking...') {
+        universalChatMessages.removeChild(loadingDiv);
+      }
+      addUniversalMessage('Sorry, I encountered an error. Please try again.', false);
+    }
+  }
+
+  // Send message on button click
+  universalChatSend.addEventListener('click', () => {
+    const message = universalChatInput.value.trim();
+    if (message) {
+      sendUniversalMessage(message);
+      universalChatInput.value = '';
+    }
+  });
+
+  // Send message on Enter key
+  universalChatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      universalChatSend.click();
+    }
+  });
+
+  // Handle quick action buttons
+  universalChatQuickBtns.forEach(button => {
+    button.addEventListener('click', () => {
+      const prompt = button.getAttribute('data-prompt');
+      if (prompt) {
+        sendUniversalMessage(prompt);
       }
     });
   });

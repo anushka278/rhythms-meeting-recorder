@@ -2049,3 +2049,60 @@ async function joinDetectedMeeting() {
     return { success: false, error: error.message };
   }
 }
+
+// Add universal chat handler that queries ALL notes
+ipcMain.handle('chatWithAllNotes', async (event, message) => {
+  try {
+    console.log('Universal chat request received:', message);
+    
+    // Load all meetings data using file operation manager
+    const meetingsData = await fileOperationManager.readMeetingsData();
+    const allMeetings = [...(meetingsData.pastMeetings || []), ...(meetingsData.upcomingMeetings || [])];
+    
+    console.log('Universal chat - Found meetings:', allMeetings.length);
+    console.log('Past meetings:', meetingsData.pastMeetings?.length || 0);
+    console.log('Upcoming meetings:', meetingsData.upcomingMeetings?.length || 0);
+    
+    if (!allMeetings || allMeetings.length === 0) {
+      return "I don't have any meeting notes to reference. Please create some meeting notes first.";
+    }
+
+    // Combine all note content for context
+    const allNotesContent = allMeetings.map(meeting => {
+      return `Meeting: ${meeting.title || 'Untitled Meeting'}
+Date: ${meeting.date || 'Unknown'}
+Content: ${meeting.content || meeting.summary || 'No content available'}
+---`;
+    }).join('\n\n');
+
+    const systemPrompt = `You are a helpful AI assistant that answers questions based on ALL meeting notes in the knowledge base. 
+    You can reference any meeting, compare information across meetings, and provide insights from the entire collection of notes.
+    If a question is not related to any of the meeting content, politely say "This is beyond the scope of the available meeting notes."
+    
+    Available Meeting Notes:
+    ${allNotesContent}`;
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message }
+    ];
+
+    console.log('Universal chat - Sending request to AI with context length:', allNotesContent.length);
+    
+    const response = await openai.chat.completions.create({
+      model: MODELS.PRIMARY,
+      messages: messages,
+      max_tokens: 800,
+      temperature: 0.7,
+      fallbacks: MODELS.FALLBACKS,
+      transform_to_openai: true,
+      route: "fallback"
+    });
+
+    console.log('Universal chat - AI response received');
+    return response.choices[0].message.content;
+  } catch (error) {
+    console.error('Error in chatWithAllNotes:', error);
+    throw error;
+  }
+});

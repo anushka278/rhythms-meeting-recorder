@@ -25,6 +25,11 @@
           </div>
         </div>
         <div class="header-right">
+          <button class="btn universal-chat-btn" id="universalChatBtn" title="Chat with all notes">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z" fill="currentColor"/>
+            </svg>
+          </button>
           <button class="btn new-note-btn" id="newNoteBtn">Record In-person Meeting</button>
           <button class="btn join-meeting-btn" id="joinMeetingBtn">Record Meeting</button>
           <button id="toggleSidebar" class="btn toggle-sidebar-btn" style="display: none;">
@@ -376,6 +381,35 @@ Chat with meeting transcript: https://notes.granola.ai/d/393a95cf-4788-4a47-9deb
           <div class="chat-input-modal">
             <input type="text" id="chatInputModal" placeholder="Ask about the meeting..." />
             <button id="sendButtonModal">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z" fill="#0077FF"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Universal Chat Modal -->
+    <div id="universalChatModal" class="universal-chat-modal" style="display: none;">
+      <div class="universal-chat-content">
+        <div class="universal-chat-header">
+          <h3>Chat with All Notes</h3>
+          <button class="universal-chat-close" id="universalChatClose">&times;</button>
+        </div>
+        <div class="universal-chat-body">
+          <div class="universal-chat-quick-actions">
+            <button class="universal-chat-quick-btn" data-prompt="What are the main themes across all my meetings?">Main themes</button>
+            <button class="universal-chat-quick-btn" data-prompt="List all action items from recent meetings">All action items</button>
+            <button class="universal-chat-quick-btn" data-prompt="What decisions were made in recent meetings?">Recent decisions</button>
+            <button class="universal-chat-quick-btn" data-prompt="Summarize key insights from all meetings">Key insights</button>
+          </div>
+          <div class="universal-chat-messages" id="universalChatMessages">
+            <!-- Universal chat messages will appear here -->
+          </div>
+          <div class="universal-chat-input">
+            <input type="text" id="universalChatInput" placeholder="Ask about any of your notes..." />
+            <button id="universalChatSend">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2.01 21L23 12L2.01 3L2 10L17 12L2 14L2.01 21Z" fill="#0077FF"/>
               </svg>
