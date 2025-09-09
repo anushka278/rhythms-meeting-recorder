@@ -37,6 +37,23 @@ let notesPerPage = 5;
 let currentPage = 1;
 let isSearchActive = false;
 
+// Advanced search filters
+let searchFilters = {
+  dateRange: null, // { type: 'last7days', custom: { from: date, to: date } }
+  meetingTypes: [], // ['document', 'calendar']
+  participants: [], // ['email@example.com']
+  content: {
+    hasTranscript: false,
+    hasAttachments: false
+  },
+  status: {
+    favorited: false,
+    recentlyModified: false
+  }
+};
+
+let isFilterPanelOpen = false;
+
 
 // Function to check if there's an active recording for the current note
 async function checkActiveRecordingState() {
@@ -1085,7 +1102,10 @@ function renderMeetings() {
   });
 
   // Filter out calendar entries
-  const filteredMeetings = allMeetings.filter(meeting => meeting.type !== 'calendar');
+  const calendarFilteredMeetings = allMeetings.filter(meeting => meeting.type !== 'calendar');
+  
+  // Apply advanced filters
+  const filteredMeetings = applyAdvancedFilters(calendarFilteredMeetings);
   
   // Calculate pagination
   const totalNotes = filteredMeetings.length;
@@ -1191,7 +1211,7 @@ function searchNotes(query) {
   // Perform case-insensitive search
   const searchQuery = query.toLowerCase();
   
-  const filteredMeetings = allMeetings.filter(meeting => {
+  const textFilteredMeetings = allMeetings.filter(meeting => {
     // Search in title
     const titleMatch = meeting.title && meeting.title.toLowerCase().includes(searchQuery);
     
@@ -1210,6 +1230,9 @@ function searchNotes(query) {
     
     return titleMatch || contentMatch || participantsMatch || transcriptMatch;
   });
+  
+  // Apply advanced filters to search results
+  const filteredMeetings = applyAdvancedFilters(textFilteredMeetings);
   
   // Render filtered results
   renderSearchResults(filteredMeetings, query);
@@ -1393,6 +1416,243 @@ function createContentPreview(meeting, query) {
   }
   
   return preview || '<div class="no-preview">No preview available</div>';
+}
+
+// ==================== ADVANCED SEARCH FILTERS ====================
+
+// Check if a meeting matches date range filter
+function isInDateRange(meetingDate, dateRange) {
+  if (!dateRange) return true;
+  
+  const meeting = new Date(meetingDate);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  switch (dateRange.type) {
+    case 'last7days':
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 7);
+      return meeting >= sevenDaysAgo;
+      
+    case 'last30days':
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      return meeting >= thirtyDaysAgo;
+      
+    case 'last90days':
+      const ninetyDaysAgo = new Date(today);
+      ninetyDaysAgo.setDate(today.getDate() - 90);
+      return meeting >= ninetyDaysAgo;
+      
+    case 'thisWeek':
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
+      return meeting >= startOfWeek;
+      
+    case 'thisMonth':
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      return meeting >= startOfMonth;
+      
+    case 'thisYear':
+      const startOfYear = new Date(today.getFullYear(), 0, 1);
+      return meeting >= startOfYear;
+      
+    case 'custom':
+      if (dateRange.custom && dateRange.custom.from && dateRange.custom.to) {
+        const fromDate = new Date(dateRange.custom.from);
+        const toDate = new Date(dateRange.custom.to);
+        toDate.setHours(23, 59, 59, 999); // Include the entire end date
+        return meeting >= fromDate && meeting <= toDate;
+      }
+      return true;
+      
+    default:
+      return true;
+  }
+}
+
+// Check if a meeting matches meeting type filter
+function matchesMeetingType(meeting, meetingTypes) {
+  if (!meetingTypes || meetingTypes.length === 0) return true;
+  return meetingTypes.includes(meeting.type);
+}
+
+// Check if a meeting matches content filters
+function matchesContentFilters(meeting, contentFilters) {
+  if (!contentFilters) return true;
+  
+  if (contentFilters.hasTranscript && (!meeting.transcript || meeting.transcript.length === 0)) {
+    return false;
+  }
+  
+  if (contentFilters.hasAttachments && (!meeting.attachments || meeting.attachments.length === 0)) {
+    return false;
+  }
+  
+  return true;
+}
+
+// Apply all filters to meetings
+function applyAdvancedFilters(meetings) {
+  return meetings.filter(meeting => {
+    // Date range filter
+    if (!isInDateRange(meeting.date, searchFilters.dateRange)) {
+      return false;
+    }
+    
+    // Meeting type filter
+    if (!matchesMeetingType(meeting, searchFilters.meetingTypes)) {
+      return false;
+    }
+    
+    // Content filters
+    if (!matchesContentFilters(meeting, searchFilters.content)) {
+      return false;
+    }
+    
+    return true;
+  });
+}
+
+// Get active filter count
+function getActiveFilterCount() {
+  let count = 0;
+  
+  if (searchFilters.dateRange) count++;
+  if (searchFilters.meetingTypes.length > 0) count++;
+  if (searchFilters.participants.length > 0) count++;
+  if (searchFilters.content.hasTranscript) count++;
+  if (searchFilters.content.hasAttachments) count++;
+  if (searchFilters.status.favorited) count++;
+  if (searchFilters.status.recentlyModified) count++;
+  
+  return count;
+}
+
+// Clear all filters
+function clearAllFilters() {
+  searchFilters = {
+    dateRange: null,
+    meetingTypes: [],
+    participants: [],
+    content: {
+      hasTranscript: false,
+      hasAttachments: false
+    },
+    status: {
+      favorited: false,
+      recentlyModified: false
+    }
+  };
+  
+  // Re-render search results or meetings
+  if (isSearchActive) {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput && searchInput.value.trim()) {
+      searchNotes(searchInput.value.trim());
+    } else {
+      renderMeetings();
+    }
+  } else {
+    renderMeetings();
+  }
+  
+  // Update filter UI
+  updateFilterUI();
+}
+
+// Update filter UI elements
+function updateFilterUI() {
+  const filterBadge = document.getElementById('filterBadge');
+  const activeCount = getActiveFilterCount();
+  
+  if (activeCount > 0) {
+    filterBadge.textContent = activeCount;
+    filterBadge.style.display = 'block';
+  } else {
+    filterBadge.style.display = 'none';
+  }
+}
+
+// Open filter modal
+function openFilterModal() {
+  const filterModal = document.getElementById('filterModal');
+  filterModal.style.display = 'flex';
+  
+  // Populate current filter values
+  populateFilterValues();
+}
+
+// Close filter modal
+function closeFilterModal() {
+  const filterModal = document.getElementById('filterModal');
+  filterModal.style.display = 'none';
+}
+
+// Populate filter form with current values
+function populateFilterValues() {
+  // Date range
+  const dateRangeInputs = document.querySelectorAll('input[name="dateRange"]');
+  dateRangeInputs.forEach(input => {
+    if (searchFilters.dateRange && input.value === searchFilters.dateRange.type) {
+      input.checked = true;
+    } else if (!searchFilters.dateRange && input.value === '') {
+      input.checked = true;
+    } else {
+      input.checked = false;
+    }
+  });
+  
+  // Meeting types
+  const meetingTypeInputs = document.querySelectorAll('input[name="meetingType"]');
+  meetingTypeInputs.forEach(input => {
+    input.checked = searchFilters.meetingTypes.includes(input.value);
+  });
+  
+  // Content filters
+  const hasTranscriptInput = document.querySelector('input[name="hasTranscript"]');
+  const hasAttachmentsInput = document.querySelector('input[name="hasAttachments"]');
+  
+  if (hasTranscriptInput) hasTranscriptInput.checked = searchFilters.content.hasTranscript;
+  if (hasAttachmentsInput) hasAttachmentsInput.checked = searchFilters.content.hasAttachments;
+}
+
+// Apply filters from form
+function applyFiltersFromForm() {
+  // Date range
+  const selectedDateRange = document.querySelector('input[name="dateRange"]:checked');
+  if (selectedDateRange && selectedDateRange.value) {
+    searchFilters.dateRange = { type: selectedDateRange.value };
+  } else {
+    searchFilters.dateRange = null;
+  }
+  
+  // Meeting types
+  const selectedMeetingTypes = Array.from(document.querySelectorAll('input[name="meetingType"]:checked'))
+    .map(input => input.value);
+  searchFilters.meetingTypes = selectedMeetingTypes;
+  
+  // Content filters
+  const hasTranscriptInput = document.querySelector('input[name="hasTranscript"]');
+  const hasAttachmentsInput = document.querySelector('input[name="hasAttachments"]');
+  
+  searchFilters.content.hasTranscript = hasTranscriptInput ? hasTranscriptInput.checked : false;
+  searchFilters.content.hasAttachments = hasAttachmentsInput ? hasAttachmentsInput.checked : false;
+  
+  // Update UI
+  updateFilterUI();
+  
+  // Re-render results
+  if (isSearchActive) {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput && searchInput.value.trim()) {
+      searchNotes(searchInput.value.trim());
+    } else {
+      renderMeetings();
+    }
+  } else {
+    renderMeetings();
+  }
 }
 
 // ==================== PAGINATION FUNCTIONALITY ====================
@@ -2565,6 +2825,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Search functionality
   const searchInput = document.getElementById('searchInput');
   const searchClearBtn = document.getElementById('searchClearBtn');
+  const searchFilterBtn = document.getElementById('searchFilterBtn');
   
   searchInput.addEventListener('input', (e) => {
     const query = e.target.value.trim();
@@ -2602,6 +2863,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       searchClearBtn.style.display = 'none';
       renderMeetings();
     }
+  });
+  
+  // Filter button
+  searchFilterBtn.addEventListener('click', () => {
+    openFilterModal();
   });
 
   // Add click event delegation for meeting cards and their actions
@@ -3051,6 +3317,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   initChatFunctionality();
   initChatModal();
   initUniversalChat();
+  
+  // Filter modal functionality
+  const filterModal = document.getElementById('filterModal');
+  const filterModalClose = document.getElementById('filterModalClose');
+  const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+  const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+  
+  // Close filter modal
+  filterModalClose.addEventListener('click', closeFilterModal);
+  
+  // Close modal when clicking outside
+  filterModal.addEventListener('click', (e) => {
+    if (e.target === filterModal) {
+      closeFilterModal();
+    }
+  });
+  
+  // Clear all filters
+  clearFiltersBtn.addEventListener('click', () => {
+    clearAllFilters();
+    closeFilterModal();
+  });
+  
+  // Apply filters
+  applyFiltersBtn.addEventListener('click', () => {
+    applyFiltersFromForm();
+    closeFilterModal();
+  });
 
 });
 
