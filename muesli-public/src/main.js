@@ -62,7 +62,6 @@ const createWindow = () => {
     backgroundColor: '#f9f9f9',
   });
 
-  // Allow the debug panel header to act as a drag region
   mainWindow.on('ready-to-show', () => {
     try {
       // Set regions that can be used to drag the window
@@ -723,13 +722,6 @@ ipcMain.handle('saveMeetingsData', async (event, data) => {
   }
 });
 
-// Debug handler to check if IPC handlers are registered
-ipcMain.handle('debugGetHandlers', async () => {
-  console.log("Checking registered IPC handlers...");
-  const handlers = Object.keys(ipcMain._invokeHandlers);
-  console.log("Registered handlers:", handlers);
-  return handlers;
-});
 
 // Handler to get active recording ID for a note
 ipcMain.handle('getActiveRecordingId', async (event, noteId) => {
@@ -1636,7 +1628,7 @@ ${transcriptText}` }
                 // Add the new text chunk to our accumulated text
                 fullText += content;
 
-                // Log each token for debugging (less verbose)
+                // Log each token (less verbose)
                 if (content.length < 50) {
                   console.log(`Received token: "${content}"`);
                 } else {
