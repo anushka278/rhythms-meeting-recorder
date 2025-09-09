@@ -2074,8 +2074,11 @@ input:checked + .toggle-slider:before {
 .filter-modal {
   max-width: 500px;
   width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .filter-modal .modal-header {
@@ -2108,11 +2111,20 @@ input:checked + .toggle-slider:before {
   color: var(--text-primary);
 }
 
+.filter-modal .modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
 .filter-sections {
   display: flex;
   flex-direction: column;
   gap: 24px;
   margin-bottom: 24px;
+  flex: 1;
 }
 
 .filter-section h3 {
@@ -2160,8 +2172,10 @@ input:checked + .toggle-slider:before {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
-  padding-top: 16px;
+  padding: 16px 0 0 0;
   border-top: 1px solid var(--border-color);
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .btn-secondary {
@@ -2184,11 +2198,122 @@ input:checked + .toggle-slider:before {
   background: #0056CC;
 }
 
+/* Participant filter */
+.participant-filter-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.participant-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: #f9f9f9;
+}
+
+.participant-search-input:focus {
+  outline: none;
+  border-color: #0077FF;
+  background-color: white;
+  box-shadow: 0 0 0 2px rgba(0, 119, 255, 0.1);
+}
+
+.participant-options {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: white;
+}
+
+.participant-option {
+  border-bottom: 1px solid #f0f0f0;
+  margin: 0;
+  border-radius: 0;
+}
+
+.participant-option:last-child {
+  border-bottom: none;
+}
+
+/* Filter chips */
+.filter-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 0 20px;
+}
+
+.filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.filter-chip-date {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid #bbdefb;
+}
+
+.filter-chip-meeting-type {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+  border: 1px solid #e1bee7;
+}
+
+.filter-chip-participant {
+  background-color: #e8f5e9;
+  color: #388e3c;
+  border: 1px solid #c8e6c9;
+}
+
+.filter-chip-content {
+  background-color: #fff3e0;
+  color: #f57c00;
+  border: 1px solid #ffcc02;
+}
+
+.filter-chip-remove {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filter-chip-remove:hover {
+  opacity: 1;
+}
+
+.filter-chip-label {
+  white-space: nowrap;
+}
+
 /* Responsive filter modal */
 @media (max-width: 768px) {
   .filter-modal {
     width: 95%;
-    max-height: 90vh;
+    height: 100vh;
+    max-height: 100vh;
+  }
+  
+  .filter-modal .modal-body {
+    padding: 16px;
   }
   
   .filter-actions {
@@ -2199,5 +2324,14 @@ input:checked + .toggle-slider:before {
   .btn-primary {
     width: 100%;
     justify-content: center;
+  }
+  
+  .filter-chips-container {
+    padding: 0 16px;
+  }
+  
+  .filter-chip {
+    font-size: 12px;
+    padding: 4px 8px;
   }
 }

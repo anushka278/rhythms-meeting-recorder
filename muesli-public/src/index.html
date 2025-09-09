@@ -28,6 +28,9 @@
               </svg>
             </button>
           </div>
+          <div class="filter-chips-container" id="filterChipsContainer" style="display: none;">
+            <!-- Filter chips will be populated dynamically -->
+          </div>
         </div>
         <div class="header-right">
           <button class="btn search-filter-btn" id="searchFilterBtn" title="Advanced filters">
@@ -486,6 +489,17 @@ Chat with meeting transcript: https://notes.granola.ai/d/393a95cf-4788-4a47-9deb
                   <input type="checkbox" name="meetingType" value="calendar">
                   <span>Calendar Events</span>
                 </label>
+              </div>
+            </div>
+
+            <!-- Participant Filter -->
+            <div class="filter-section">
+              <h3>Participants</h3>
+              <div class="participant-filter-container">
+                <input type="text" class="participant-search-input" id="participantSearchInput" placeholder="Search participants...">
+                <div class="participant-options" id="participantOptions">
+                  <!-- Participants will be populated dynamically -->
+                </div>
               </div>
             </div>
 

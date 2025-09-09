@@ -1477,6 +1477,26 @@ function matchesMeetingType(meeting, meetingTypes) {
   return meetingTypes.includes(meeting.type);
 }
 
+// Check if a meeting matches participant filter
+function matchesParticipantFilter(meeting, participantFilters) {
+  if (!participantFilters || participantFilters.length === 0) return true;
+  
+  if (!meeting.participants || meeting.participants.length === 0) return false;
+  
+  return participantFilters.some(filterParticipant => {
+    return meeting.participants.some(participant => {
+      const participantName = participant.name ? participant.name.toLowerCase() : '';
+      const participantEmail = participant.email ? participant.email.toLowerCase() : '';
+      const filterLower = filterParticipant.toLowerCase();
+      
+      return participantName.includes(filterLower) || 
+             participantEmail.includes(filterLower) ||
+             participantName === filterLower ||
+             participantEmail === filterLower;
+    });
+  });
+}
+
 // Check if a meeting matches content filters
 function matchesContentFilters(meeting, contentFilters) {
   if (!contentFilters) return true;
@@ -1505,6 +1525,11 @@ function applyAdvancedFilters(meetings) {
       return false;
     }
     
+    // Participant filter
+    if (!matchesParticipantFilter(meeting, searchFilters.participants)) {
+      return false;
+    }
+    
     // Content filters
     if (!matchesContentFilters(meeting, searchFilters.content)) {
       return false;
@@ -1512,6 +1537,25 @@ function applyAdvancedFilters(meetings) {
     
     return true;
   });
+}
+
+// Get unique participants from all meetings
+function getUniqueParticipants() {
+  const allMeetings = [...upcomingMeetings, ...pastMeetings];
+  const participants = new Set();
+  
+  allMeetings.forEach(meeting => {
+    if (meeting.participants && meeting.participants.length > 0) {
+      meeting.participants.forEach(participant => {
+        if (participant.name || participant.email) {
+          const displayName = participant.name || participant.email;
+          participants.add(displayName);
+        }
+      });
+    }
+  });
+  
+  return Array.from(participants).sort();
 }
 
 // Get active filter count
@@ -1559,6 +1603,7 @@ function clearAllFilters() {
   
   // Update filter UI
   updateFilterUI();
+  renderFilterChips();
 }
 
 // Update filter UI elements
@@ -1615,6 +1660,144 @@ function populateFilterValues() {
   
   if (hasTranscriptInput) hasTranscriptInput.checked = searchFilters.content.hasTranscript;
   if (hasAttachmentsInput) hasAttachmentsInput.checked = searchFilters.content.hasAttachments;
+  
+  // Populate participants
+  populateParticipantOptions();
+}
+
+// Populate participant options
+function populateParticipantOptions() {
+  const participantOptions = document.getElementById('participantOptions');
+  const participants = getUniqueParticipants();
+  
+  participantOptions.innerHTML = '';
+  
+  participants.forEach(participant => {
+    const isSelected = searchFilters.participants.includes(participant);
+    const option = document.createElement('label');
+    option.className = 'filter-option participant-option';
+    option.innerHTML = `
+      <input type="checkbox" name="participant" value="${participant}" ${isSelected ? 'checked' : ''}>
+      <span>${participant}</span>
+    `;
+    participantOptions.appendChild(option);
+  });
+}
+
+// Filter participants based on search
+function filterParticipants() {
+  const searchInput = document.getElementById('participantSearchInput');
+  const participantOptions = document.querySelectorAll('.participant-option');
+  const searchTerm = searchInput.value.toLowerCase();
+  
+  participantOptions.forEach(option => {
+    const participantName = option.textContent.toLowerCase();
+    if (participantName.includes(searchTerm)) {
+      option.style.display = 'flex';
+    } else {
+      option.style.display = 'none';
+    }
+  });
+}
+
+// Render filter chips
+function renderFilterChips() {
+  const container = document.getElementById('filterChipsContainer');
+  const activeCount = getActiveFilterCount();
+  
+  if (activeCount === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  
+  container.style.display = 'block';
+  container.innerHTML = '';
+  
+  // Date range chip
+  if (searchFilters.dateRange) {
+    const chip = createFilterChip('date', getDateRangeLabel(searchFilters.dateRange), () => {
+      searchFilters.dateRange = null;
+      updateFilterUI();
+      applyFiltersFromForm();
+    });
+    container.appendChild(chip);
+  }
+  
+  // Meeting type chips
+  searchFilters.meetingTypes.forEach(type => {
+    const chip = createFilterChip('meeting-type', getMeetingTypeLabel(type), () => {
+      searchFilters.meetingTypes = searchFilters.meetingTypes.filter(t => t !== type);
+      updateFilterUI();
+      applyFiltersFromForm();
+    });
+    container.appendChild(chip);
+  });
+  
+  // Participant chips
+  searchFilters.participants.forEach(participant => {
+    const chip = createFilterChip('participant', participant, () => {
+      searchFilters.participants = searchFilters.participants.filter(p => p !== participant);
+      updateFilterUI();
+      applyFiltersFromForm();
+    });
+    container.appendChild(chip);
+  });
+  
+  // Content filter chips
+  if (searchFilters.content.hasTranscript) {
+    const chip = createFilterChip('content', 'Has transcript', () => {
+      searchFilters.content.hasTranscript = false;
+      updateFilterUI();
+      applyFiltersFromForm();
+    });
+    container.appendChild(chip);
+  }
+  
+  if (searchFilters.content.hasAttachments) {
+    const chip = createFilterChip('content', 'Has attachments', () => {
+      searchFilters.content.hasAttachments = false;
+      updateFilterUI();
+      applyFiltersFromForm();
+    });
+    container.appendChild(chip);
+  }
+}
+
+// Create a filter chip
+function createFilterChip(type, label, onRemove) {
+  const chip = document.createElement('div');
+  chip.className = `filter-chip filter-chip-${type}`;
+  chip.innerHTML = `
+    <span class="filter-chip-label">${label}</span>
+    <button class="filter-chip-remove" onclick="event.stopPropagation(); (${onRemove.toString()})()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="currentColor"/>
+      </svg>
+    </button>
+  `;
+  return chip;
+}
+
+// Get date range label
+function getDateRangeLabel(dateRange) {
+  const labels = {
+    'last7days': 'Last 7 days',
+    'last30days': 'Last 30 days',
+    'last90days': 'Last 90 days',
+    'thisWeek': 'This week',
+    'thisMonth': 'This month',
+    'thisYear': 'This year'
+  };
+  return labels[dateRange.type] || 'Custom date range';
+}
+
+// Get meeting type label
+function getMeetingTypeLabel(type) {
+  const labels = {
+    'document': 'Document Notes',
+    'calendar': 'Calendar Events'
+  };
+  return labels[type] || type;
 }
 
 // Apply filters from form
@@ -1632,6 +1815,11 @@ function applyFiltersFromForm() {
     .map(input => input.value);
   searchFilters.meetingTypes = selectedMeetingTypes;
   
+  // Participants
+  const selectedParticipants = Array.from(document.querySelectorAll('input[name="participant"]:checked'))
+    .map(input => input.value);
+  searchFilters.participants = selectedParticipants;
+  
   // Content filters
   const hasTranscriptInput = document.querySelector('input[name="hasTranscript"]');
   const hasAttachmentsInput = document.querySelector('input[name="hasAttachments"]');
@@ -1641,6 +1829,7 @@ function applyFiltersFromForm() {
   
   // Update UI
   updateFilterUI();
+  renderFilterChips();
   
   // Re-render results
   if (isSearchActive) {
@@ -3345,6 +3534,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyFiltersFromForm();
     closeFilterModal();
   });
+  
+  // Participant search
+  const participantSearchInput = document.getElementById('participantSearchInput');
+  if (participantSearchInput) {
+    participantSearchInput.addEventListener('input', filterParticipants);
+  }
 
 });
 
