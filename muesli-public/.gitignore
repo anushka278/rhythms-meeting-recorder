@@ -90,3 +90,7 @@ typings/
 
 # Electron-Forge
 out/
+
+# Credential files
+credentials.json
+credentials_updated.json
