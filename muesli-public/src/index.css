@@ -88,12 +88,35 @@ body {
 
 .search-input {
   width: 100%;
-  padding: 8px 8px 8px 35px;
+  padding: 8px 35px 8px 35px;
   border-radius: 5px;
   border: 1px solid var(--border-color);
   background-color: #f2f2f2;
   font-size: 14px;
   -webkit-app-region: no-drag; /* Make input not draggable to allow text selection */
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.search-clear-btn:hover {
+  background-color: #e0e0e0;
+  color: var(--text-primary);
 }
 
 .btn {
@@ -1799,4 +1822,104 @@ input:checked + .toggle-slider:before {
 
 .universal-chat-send:active {
   transform: scale(0.95);
+}
+
+/* ==================== SEARCH STYLES ==================== */
+
+/* Search highlighting */
+.search-highlight {
+  background-color: #ffeb3b;
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
+/* Search result cards */
+.search-result-card {
+  border-left: 3px solid #0077FF;
+  background-color: #f8f9ff;
+}
+
+.search-result-card:hover {
+  background-color: #f0f2ff;
+}
+
+/* Search content preview */
+.search-content-preview {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.content-snippet {
+  background-color: #f5f5f5;
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.participants-snippet {
+  color: #0077FF;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.transcript-snippet {
+  color: #10B981;
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+.no-preview {
+  color: #999;
+  font-style: italic;
+}
+
+/* Search empty state */
+.search-empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+}
+
+.search-empty-state svg {
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.search-empty-state p {
+  margin: 8px 0;
+}
+
+.search-hint {
+  font-size: 14px;
+  color: #999;
+}
+
+/* Search input focus state */
+.search-input:focus {
+  outline: none;
+  border-color: #0077FF;
+  background-color: white;
+  box-shadow: 0 0 0 2px rgba(0, 119, 255, 0.1);
+}
+
+/* Search results section */
+.meetings-section h2 {
+  margin-bottom: 16px;
+}
+
+/* Responsive search */
+@media (max-width: 768px) {
+  .search-content-preview {
+    font-size: 12px;
+  }
+  
+  .content-snippet {
+    font-size: 11px;
+    padding: 4px 6px;
+  }
 }

@@ -1152,6 +1152,220 @@ async function loadMeetingsDataFromFile() {
   }
 }
 
+// ==================== SEARCH FUNCTIONALITY ====================
+
+// Search through notes
+function searchNotes(query) {
+  const allMeetings = [...upcomingMeetings, ...pastMeetings].filter(m => m.type !== 'calendar');
+  
+  // Perform case-insensitive search
+  const searchQuery = query.toLowerCase();
+  
+  const filteredMeetings = allMeetings.filter(meeting => {
+    // Search in title
+    const titleMatch = meeting.title && meeting.title.toLowerCase().includes(searchQuery);
+    
+    // Search in content
+    const contentMatch = meeting.content && meeting.content.toLowerCase().includes(searchQuery);
+    
+    // Search in participants
+    const participantsMatch = meeting.participants && meeting.participants.some(participant => 
+      participant.name && participant.name.toLowerCase().includes(searchQuery)
+    );
+    
+    // Search in transcript
+    const transcriptMatch = meeting.transcript && meeting.transcript.some(entry => 
+      entry.text && entry.text.toLowerCase().includes(searchQuery)
+    );
+    
+    return titleMatch || contentMatch || participantsMatch || transcriptMatch;
+  });
+  
+  // Render filtered results
+  renderSearchResults(filteredMeetings, query);
+}
+
+// Render search results
+function renderSearchResults(meetings, query) {
+  // Get the main content container
+  const mainContent = document.querySelector('.main-content .content-container');
+  
+  // Only clear and recreate the notes section, preserve upcoming meetings section
+  let notesSection = mainContent.querySelector('.meetings-section:not(#upcoming-section)');
+  
+  if (notesSection) {
+    // Remove existing notes section
+    notesSection.remove();
+  }
+  
+  // Create new notes section
+  notesSection = document.createElement('section');
+  notesSection.className = 'meetings-section';
+  
+  if (meetings.length === 0) {
+    notesSection.innerHTML = `
+      <h2 class="section-title">Search Results</h2>
+      <div class="search-empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15.5 14H14.71L14.43 13.73C15.41 12.59 16 11.11 16 9.5C16 5.91 13.09 3 9.5 3C5.91 3 3 5.91 3 9.5C3 13.09 5.91 16 9.5 16C11.11 16 12.59 15.41 13.73 14.43L14 14.71V15.5L19 20.49L20.49 19L15.5 14ZM9.5 14C7.01 14 5 11.99 5 9.5C5 7.01 7.01 5 9.5 5C11.99 5 14 7.01 14 9.5C14 11.99 11.99 14 9.5 14Z" fill="#999"/>
+        </svg>
+        <p>No notes found for "${query}"</p>
+        <p class="search-hint">Try searching for different keywords or check your spelling</p>
+      </div>
+    `;
+  } else {
+    notesSection.innerHTML = `
+      <h2 class="section-title">Search Results for "${query}" (${meetings.length} found)</h2>
+      <div class="meetings-list" id="notes-list"></div>
+    `;
+    
+    // Get the notes container
+    const notesContainer = notesSection.querySelector('#notes-list');
+    
+    // Sort by date, newest first
+    meetings.sort((a, b) => {
+      return new Date(b.date) - new Date(a.date);
+    });
+    
+    // Add meetings to the container with search highlighting
+    meetings.forEach(meeting => {
+      notesContainer.appendChild(createSearchResultCard(meeting, query));
+    });
+  }
+  
+  mainContent.appendChild(notesSection);
+}
+
+// Create search result card with highlighting
+function createSearchResultCard(meeting, query) {
+  const card = document.createElement('div');
+  card.className = 'meeting-card search-result-card';
+  card.dataset.id = meeting.id;
+
+  let iconHtml = '';
+
+  if (meeting.type === 'profile') {
+    iconHtml = `
+      <div class="profile-pic">
+        <img src="https://via.placeholder.com/40" alt="Profile">
+      </div>
+    `;
+  } else if (meeting.type === 'calendar') {
+    iconHtml = `
+      <div class="meeting-icon calendar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 4H18V2H16V4H8V2H6V4H5C3.89 4 3.01 4.9 3.01 6L3 20C3 21.1 3.89 22 5 22H19C20.1 22 21 21.1 21 20V6C21 4.9 20.1 4 19 4ZM19 20H5V10H19V20ZM19 8H5V6H19V8ZM9 14H7V12H9V14ZM13 14H11V12H13V14ZM17 14H15V12H17V14ZM9 18H7V16H9V18ZM13 18H11V16H13V18ZM17 18H15V16H17V18Z" fill="#6947BD"/>
+        </svg>
+      </div>
+    `;
+  } else if (meeting.type === 'document') {
+    iconHtml = `
+      <div class="meeting-icon document">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 2H6C4.9 2 4.01 2.9 4.01 4L4 20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2ZM16 18H8V16H16V18ZM16 14H8V12H16V14ZM13 9V3.5L18.5 9H13Z" fill="#4CAF50"/>
+        </svg>
+      </div>
+    `;
+  }
+
+  let subtitleHtml = meeting.hasDemo
+    ? `<div class="meeting-time"><a class="meeting-demo-link">${meeting.subtitle}</a></div>`
+    : `<div class="meeting-time">${meeting.subtitle}</div>`;
+
+  // Highlight search terms in title and content
+  const highlightedTitle = highlightSearchTerms(meeting.title, query);
+  const highlightedContent = highlightSearchTerms(meeting.content, query);
+  
+  // Create content preview with highlighting
+  const contentPreview = createContentPreview(meeting, query);
+
+  card.innerHTML = `
+    ${iconHtml}
+    <div class="meeting-content">
+      <div class="meeting-title">${highlightedTitle}</div>
+      ${subtitleHtml}
+      <div class="search-content-preview">${contentPreview}</div>
+    </div>
+    <div class="meeting-actions">
+      <button class="delete-meeting-btn" data-id="${meeting.id}" title="Delete note">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
+  `;
+
+  return card;
+}
+
+// Highlight search terms in text
+function highlightSearchTerms(text, query) {
+  if (!text || !query) return text;
+  
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  return text.replace(regex, '<mark class="search-highlight">$1</mark>');
+}
+
+// Create content preview for search results
+function createContentPreview(meeting, query) {
+  let preview = '';
+  const searchQuery = query.toLowerCase();
+  
+  // Check if content contains the search term
+  if (meeting.content && meeting.content.toLowerCase().includes(searchQuery)) {
+    const content = meeting.content;
+    const index = content.toLowerCase().indexOf(searchQuery);
+    
+    // Get context around the search term (50 chars before and after)
+    const start = Math.max(0, index - 50);
+    const end = Math.min(content.length, index + query.length + 50);
+    let snippet = content.substring(start, end);
+    
+    // Add ellipsis if we're not at the beginning/end
+    if (start > 0) snippet = '...' + snippet;
+    if (end < content.length) snippet = snippet + '...';
+    
+    preview = `<div class="content-snippet">${highlightSearchTerms(snippet, query)}</div>`;
+  }
+  
+  // Check if participants contain the search term
+  if (meeting.participants && meeting.participants.some(p => 
+    p.name && p.name.toLowerCase().includes(searchQuery)
+  )) {
+    const matchingParticipants = meeting.participants.filter(p => 
+      p.name && p.name.toLowerCase().includes(searchQuery)
+    );
+    preview += `<div class="participants-snippet">Participants: ${matchingParticipants.map(p => 
+      highlightSearchTerms(p.name, query)
+    ).join(', ')}</div>`;
+  }
+  
+  // Check if transcript contains the search term
+  if (meeting.transcript && meeting.transcript.some(entry => 
+    entry.text && entry.text.toLowerCase().includes(searchQuery)
+  )) {
+    const matchingTranscript = meeting.transcript.find(entry => 
+      entry.text && entry.text.toLowerCase().includes(searchQuery)
+    );
+    if (matchingTranscript) {
+      const speaker = matchingTranscript.speaker || 'Speaker';
+      const text = matchingTranscript.text;
+      const index = text.toLowerCase().indexOf(searchQuery);
+      const start = Math.max(0, index - 30);
+      const end = Math.min(text.length, index + query.length + 30);
+      let snippet = text.substring(start, end);
+      
+      if (start > 0) snippet = '...' + snippet;
+      if (end < text.length) snippet = snippet + '...';
+      
+      preview += `<div class="transcript-snippet">${speaker}: ${highlightSearchTerms(snippet, query)}</div>`;
+    }
+  }
+  
+  return preview || '<div class="no-preview">No preview available</div>';
+}
+
+
 // Function to update the transcript section in the debug panel
 function updateDebugTranscript(transcript) {
   const transcriptContent = document.getElementById('transcriptContent');
@@ -2200,9 +2414,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  document.querySelector('.search-input').addEventListener('input', (e) => {
-    console.log('Search query:', e.target.value);
-    // TODO: Implement search functionality
+  // Search functionality
+  const searchInput = document.getElementById('searchInput');
+  const searchClearBtn = document.getElementById('searchClearBtn');
+  
+  searchInput.addEventListener('input', (e) => {
+    const query = e.target.value.trim();
+    console.log('Search query:', query);
+    
+    // Show/hide clear button
+    if (query.length > 0) {
+      searchClearBtn.style.display = 'flex';
+    } else {
+      searchClearBtn.style.display = 'none';
+    }
+    
+    if (query.length === 0) {
+      // If search is empty, show all notes
+      renderMeetings();
+    } else {
+      // Perform search
+      searchNotes(query);
+    }
+  });
+  
+  // Clear search button
+  searchClearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    searchClearBtn.style.display = 'none';
+    renderMeetings();
+  });
+  
+  // Clear search on Escape key
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      searchClearBtn.style.display = 'none';
+      renderMeetings();
+    }
   });
 
   // Add click event delegation for meeting cards and their actions
@@ -2930,4 +3179,6 @@ function initUniversalChat() {
       }
     });
   });
+
 }
+
