@@ -32,6 +32,11 @@ window.currentRecordingId = null;
 // Store current view mode (summary or transcript)
 let currentViewMode = 'summary';
 
+// Pagination variables
+let notesPerPage = 5;
+let currentPage = 1;
+let isSearchActive = false;
+
 
 // Function to check if there's an active recording for the current note
 async function checkActiveRecordingState() {
@@ -1063,11 +1068,13 @@ function renderMeetings() {
   notesSection.innerHTML = `
     <h2 class="section-title">Meeting Notes</h2>
     <div class="meetings-list" id="notes-list"></div>
+    <div class="pagination-controls" id="paginationControls"></div>
   `;
   mainContent.appendChild(notesSection);
 
   // Get the notes container
   const notesContainer = notesSection.querySelector('#notes-list');
+  const paginationControls = notesSection.querySelector('#paginationControls');
 
   // Add all meetings to the notes section (both upcoming and past)
   const allMeetings = [...upcomingMeetings, ...pastMeetings];
@@ -1077,12 +1084,35 @@ function renderMeetings() {
     return new Date(b.date) - new Date(a.date);
   });
 
-  // Filter out calendar entries and add only document type meetings to the container
-  allMeetings
-    .filter(meeting => meeting.type !== 'calendar') // Skip calendar entries
-    .forEach(meeting => {
-      notesContainer.appendChild(createMeetingCard(meeting));
-    });
+  // Filter out calendar entries
+  const filteredMeetings = allMeetings.filter(meeting => meeting.type !== 'calendar');
+  
+  // Calculate pagination
+  const totalNotes = filteredMeetings.length;
+  const startIndex = 0;
+  const endIndex = Math.min(notesPerPage, totalNotes);
+  const notesToShow = filteredMeetings.slice(startIndex, endIndex);
+  const hasMoreNotes = totalNotes > notesPerPage;
+
+  // Add notes to the container
+  notesToShow.forEach(meeting => {
+    notesContainer.appendChild(createMeetingCard(meeting));
+  });
+
+  // Add pagination controls if there are more notes
+  if (hasMoreNotes) {
+    const remainingCount = totalNotes - notesPerPage;
+    paginationControls.innerHTML = `
+      <button class="show-more-btn" id="showMoreBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7.41 8.59L12 13.17L16.59 8.59L18 10L12 16L6 10L7.41 8.59Z" fill="currentColor"/>
+        </svg>
+        Show ${remainingCount} more note${remainingCount === 1 ? '' : 's'}
+      </button>
+    `;
+  } else {
+    paginationControls.innerHTML = '';
+  }
 }
 
 // Load meetings data from file
@@ -1363,6 +1393,124 @@ function createContentPreview(meeting, query) {
   }
   
   return preview || '<div class="no-preview">No preview available</div>';
+}
+
+// ==================== PAGINATION FUNCTIONALITY ====================
+
+// Show more notes function
+function showMoreNotes() {
+  const allMeetings = [...upcomingMeetings, ...pastMeetings];
+  const filteredMeetings = allMeetings.filter(meeting => meeting.type !== 'calendar');
+  
+  // Sort by date, newest first
+  filteredMeetings.sort((a, b) => {
+    return new Date(b.date) - new Date(a.date);
+  });
+  
+  // Get current notes container
+  const notesContainer = document.querySelector('#notes-list');
+  const paginationControls = document.querySelector('#paginationControls');
+  
+  if (!notesContainer || !paginationControls) return;
+  
+  // Calculate how many more notes to show
+  const currentNotesCount = notesContainer.children.length;
+  const totalNotes = filteredMeetings.length;
+  const remainingNotes = totalNotes - currentNotesCount;
+  
+  if (remainingNotes <= 0) return;
+  
+  // Show additional notes (up to notesPerPage more)
+  const notesToAdd = Math.min(notesPerPage, remainingNotes);
+  const startIndex = currentNotesCount;
+  const endIndex = startIndex + notesToAdd;
+  const additionalNotes = filteredMeetings.slice(startIndex, endIndex);
+  
+  // Add the additional notes
+  additionalNotes.forEach(meeting => {
+    notesContainer.appendChild(createMeetingCard(meeting));
+  });
+  
+  // Update pagination controls
+  const newRemainingCount = totalNotes - (currentNotesCount + notesToAdd);
+  const newCurrentCount = currentNotesCount + notesToAdd;
+  
+  if (newRemainingCount > 0) {
+    // Still more notes to show
+    paginationControls.innerHTML = `
+      <div class="pagination-buttons">
+        <button class="show-less-btn" id="showLessBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7.41 15.41L12 10.83L16.59 15.41L18 14L12 8L6 14L7.41 15.41Z" fill="currentColor"/>
+          </svg>
+          Show Less
+        </button>
+        <button class="show-more-btn" id="showMoreBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7.41 8.59L12 13.17L16.59 8.59L18 10L12 16L6 10L7.41 8.59Z" fill="currentColor"/>
+          </svg>
+          Show ${newRemainingCount} more note${newRemainingCount === 1 ? '' : 's'}
+        </button>
+      </div>
+    `;
+  } else {
+    // All notes are shown, only show less button
+    paginationControls.innerHTML = `
+      <div class="pagination-buttons">
+        <button class="show-less-btn" id="showLessBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7.41 15.41L12 10.83L16.59 15.41L18 14L12 8L6 14L7.41 15.41Z" fill="currentColor"/>
+          </svg>
+          Show Less
+        </button>
+      </div>
+    `;
+  }
+}
+
+// Show less notes function
+function showLessNotes() {
+  const allMeetings = [...upcomingMeetings, ...pastMeetings];
+  const filteredMeetings = allMeetings.filter(meeting => meeting.type !== 'calendar');
+  
+  // Sort by date, newest first
+  filteredMeetings.sort((a, b) => {
+    return new Date(b.date) - new Date(a.date);
+  });
+  
+  // Get current notes container
+  const notesContainer = document.querySelector('#notes-list');
+  const paginationControls = document.querySelector('#paginationControls');
+  
+  if (!notesContainer || !paginationControls) return;
+  
+  // Keep only the first notesPerPage notes
+  const notesToKeep = Math.min(notesPerPage, filteredMeetings.length);
+  const currentNotes = Array.from(notesContainer.children);
+  
+  // Remove excess notes
+  for (let i = notesToKeep; i < currentNotes.length; i++) {
+    currentNotes[i].remove();
+  }
+  
+  // Update pagination controls
+  const totalNotes = filteredMeetings.length;
+  const remainingNotes = totalNotes - notesPerPage;
+  
+  if (remainingNotes > 0) {
+    // Show show more button
+    paginationControls.innerHTML = `
+      <button class="show-more-btn" id="showMoreBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7.41 8.59L12 13.17L16.59 8.59L18 10L12 16L6 10L7.41 8.59Z" fill="currentColor"/>
+        </svg>
+        Show ${remainingNotes} more note${remainingNotes === 1 ? '' : 's'}
+      </button>
+    `;
+  } else {
+    // No pagination needed
+    paginationControls.innerHTML = '';
+  }
 }
 
 
@@ -2425,15 +2573,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Show/hide clear button
     if (query.length > 0) {
       searchClearBtn.style.display = 'flex';
+      isSearchActive = true;
     } else {
       searchClearBtn.style.display = 'none';
+      isSearchActive = false;
     }
     
     if (query.length === 0) {
-      // If search is empty, show all notes
+      // If search is empty, show all notes with pagination
       renderMeetings();
     } else {
-      // Perform search
+      // Perform search (shows all results, no pagination)
       searchNotes(query);
     }
   });
@@ -2456,6 +2606,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Add click event delegation for meeting cards and their actions
   document.querySelector('.main-content').addEventListener('click', (e) => {
+    // Check if show more button was clicked
+    if (e.target.closest('.show-more-btn')) {
+      e.preventDefault();
+      e.stopPropagation();
+      showMoreNotes();
+      return;
+    }
+    
+    // Check if show less button was clicked
+    if (e.target.closest('.show-less-btn')) {
+      e.preventDefault();
+      e.stopPropagation();
+      showLessNotes();
+      return;
+    }
+    
     // Check if delete button was clicked
     if (e.target.closest('.delete-meeting-btn')) {
       e.stopPropagation(); // Prevent opening the note

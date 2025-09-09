@@ -1923,3 +1923,116 @@ input:checked + .toggle-slider:before {
     padding: 4px 6px;
   }
 }
+
+/* ==================== PAGINATION STYLES ==================== */
+
+/* Pagination controls container */
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 0 20px;
+}
+
+/* Pagination buttons container */
+.pagination-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Show more button */
+.show-more-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #0077FF 0%, #0056CC 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 119, 255, 0.2);
+  -webkit-app-region: no-drag;
+}
+
+.show-more-btn:hover {
+  background: linear-gradient(135deg, #0056CC 0%, #0044AA 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 119, 255, 0.3);
+}
+
+.show-more-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 119, 255, 0.2);
+}
+
+.show-more-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.show-more-btn:hover svg {
+  transform: translateY(1px);
+}
+
+/* Show less button */
+.show-less-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #6B7280 0%, #4B5563 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(107, 114, 128, 0.2);
+  -webkit-app-region: no-drag;
+}
+
+.show-less-btn:hover {
+  background: linear-gradient(135deg, #4B5563 0%, #374151 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+}
+
+.show-less-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(107, 114, 128, 0.2);
+}
+
+.show-less-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.show-less-btn:hover svg {
+  transform: translateY(-1px);
+}
+
+/* Responsive pagination */
+@media (max-width: 768px) {
+  .pagination-controls {
+    margin-top: 16px;
+    padding: 0 16px;
+  }
+  
+  .pagination-buttons {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .show-more-btn,
+  .show-less-btn {
+    padding: 10px 20px;
+    font-size: 13px;
+    width: 100%;
+    justify-content: center;
+  }
+}
