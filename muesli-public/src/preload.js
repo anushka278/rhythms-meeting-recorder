@@ -47,5 +47,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Chat APIs
   chatWithOpenAI: (message, noteContent) => ipcRenderer.invoke('chatWithOpenAI', message, noteContent),
-  chatWithAllNotes: (message) => ipcRenderer.invoke('chatWithAllNotes', message)
+  chatWithAllNotes: (message) => ipcRenderer.invoke('chatWithAllNotes', message),
+  
+  // Folder management APIs
+  createFolder: (name, color) => ipcRenderer.invoke('createFolder', name, color),
+  updateFolder: (folderId, updates) => ipcRenderer.invoke('updateFolder', folderId, updates),
+  deleteFolder: (folderId) => ipcRenderer.invoke('deleteFolder', folderId),
+  moveNoteToFolder: (noteId, folderId) => ipcRenderer.invoke('moveNoteToFolder', noteId, folderId),
+  getFolders: () => ipcRenderer.invoke('getFolders'),
+  updateFolderCounts: () => ipcRenderer.invoke('updateFolderCounts')
 });

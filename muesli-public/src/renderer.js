@@ -11,7 +11,8 @@ import './index.css';
 // Create empty meetings data structure to be filled from the file
 const meetingsData = {
   upcomingMeetings: [],
-  pastMeetings: []
+  pastMeetings: [],
+  folders: []
 };
 
 // Create empty arrays that will be filled from file
@@ -54,6 +55,9 @@ let searchFilters = {
 
 let isFilterPanelOpen = false;
 
+// Folder system variables
+let folders = [];
+let currentFolderId = null; // null means inbox (uncategorized notes)
 
 // Function to check if there's an active recording for the current note
 async function checkActiveRecordingState() {
@@ -974,7 +978,8 @@ async function createNewMeeting() {
     hasDemo: false,
     date: now.toISOString(),
     participants: [],
-    content: template // Set the content directly
+    content: template, // Set the content directly
+    folderId: null // New notes start in inbox (no folder)
   };
 
   // Log what we're adding
@@ -1048,6 +1053,116 @@ async function createNewMeeting() {
   return id;
 }
 
+// Folder management functions
+async function loadFolders() {
+  try {
+    const result = await window.electronAPI.getFolders();
+    if (result.success) {
+      folders = result.folders || [];
+      console.log('Loaded folders:', folders.length);
+    } else {
+      console.error('Failed to load folders:', result.error);
+    }
+  } catch (error) {
+    console.error('Error loading folders:', error);
+  }
+}
+
+async function createFolder(name, color = '#3B82F6') {
+  try {
+    const result = await window.electronAPI.createFolder(name, color);
+    if (result.success) {
+      folders.push(result.folder);
+      console.log('Created folder:', result.folder);
+      return result.folder;
+    } else {
+      console.error('Failed to create folder:', result.error);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    return null;
+  }
+}
+
+async function updateFolder(folderId, updates) {
+  try {
+    const result = await window.electronAPI.updateFolder(folderId, updates);
+    if (result.success) {
+      const folderIndex = folders.findIndex(f => f.id === folderId);
+      if (folderIndex !== -1) {
+        folders[folderIndex] = result.folder;
+      }
+      console.log('Updated folder:', result.folder);
+      return result.folder;
+    } else {
+      console.error('Failed to update folder:', result.error);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error updating folder:', error);
+    return null;
+  }
+}
+
+async function deleteFolder(folderId) {
+  try {
+    const result = await window.electronAPI.deleteFolder(folderId);
+    if (result.success) {
+      folders = folders.filter(f => f.id !== folderId);
+      console.log('Deleted folder:', folderId);
+      return true;
+    } else {
+      console.error('Failed to delete folder:', result.error);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error deleting folder:', error);
+    return false;
+  }
+}
+
+async function moveNoteToFolder(noteId, folderId) {
+  try {
+    const result = await window.electronAPI.moveNoteToFolder(noteId, folderId);
+    if (result.success) {
+      // Update the local meeting data
+      const allMeetings = [...upcomingMeetings, ...pastMeetings];
+      const meeting = allMeetings.find(m => m.id === noteId);
+      if (meeting) {
+        meeting.folderId = folderId;
+      }
+      console.log('Moved note to folder:', noteId, folderId);
+      return true;
+    } else {
+      console.error('Failed to move note to folder:', result.error);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error moving note to folder:', error);
+    return false;
+  }
+}
+
+function getNotesForCurrentFolder() {
+  const allMeetings = [...upcomingMeetings, ...pastMeetings];
+  
+  if (currentFolderId === null) {
+    // Show inbox (uncategorized notes)
+    return allMeetings.filter(meeting => !meeting.folderId);
+  } else {
+    // Show notes in selected folder
+    return allMeetings.filter(meeting => meeting.folderId === currentFolderId);
+  }
+}
+
+function setCurrentFolder(folderId) {
+  currentFolderId = folderId;
+  console.log('Set current folder to:', folderId);
+  // Re-render meetings to show only notes in this folder
+  renderMeetings();
+}
+
 // Function to render meetings to the page
 function renderMeetings() {
   // Get the main content container
@@ -1075,16 +1190,16 @@ function renderMeetings() {
   const notesContainer = notesSection.querySelector('#notes-list');
   const paginationControls = notesSection.querySelector('#paginationControls');
 
-  // Add all meetings to the notes section (both upcoming and past)
-  const allMeetings = [...upcomingMeetings, ...pastMeetings];
+  // Get meetings for current folder
+  const folderMeetings = getNotesForCurrentFolder();
 
   // Sort by date, newest first
-  allMeetings.sort((a, b) => {
+  folderMeetings.sort((a, b) => {
     return new Date(b.date) - new Date(a.date);
   });
 
   // Filter out calendar entries
-  const calendarFilteredMeetings = allMeetings.filter(meeting => meeting.type !== 'calendar');
+  const calendarFilteredMeetings = folderMeetings.filter(meeting => meeting.type !== 'calendar');
   
   // Apply advanced filters
   const filteredMeetings = applyAdvancedFilters(calendarFilteredMeetings);
@@ -1139,6 +1254,10 @@ async function loadMeetingsDataFromFile() {
         result.data.pastMeetings = [];
       }
 
+      if (!result.data.folders) {
+        result.data.folders = [];
+      }
+
       // Update the meetings data objects
       Object.assign(meetingsData, result.data);
 
@@ -1173,6 +1292,9 @@ async function loadMeetingsDataFromFile() {
       });
 
       console.log('Meetings data loaded from file');
+
+      // Load folders
+      await loadFolders();
 
       // Re-render the meetings
       renderMeetings();

@@ -248,7 +248,11 @@ const fileOperationManager = {
     } catch (error) {
       console.error('Error reading meetings data:', error);
       // If file doesn't exist or is invalid, return empty structure
-      return { upcomingMeetings: [], pastMeetings: [] };
+      return { 
+        upcomingMeetings: [], 
+        pastMeetings: [],
+        folders: []
+      };
     }
   },
 
@@ -325,6 +329,171 @@ const fileOperationManager = {
   // Helper to write data directly - internally uses scheduleOperation
   writeData: async function(data) {
     return this.scheduleOperation(() => data); // Simply return the data to write
+  }
+};
+
+// Folder management functions
+const folderManager = {
+  // Create a new folder
+  createFolder: async function(name, color = '#3B82F6') {
+    try {
+      const meetingsData = await fileOperationManager.readMeetingsData();
+      
+      // Ensure folders array exists
+      if (!meetingsData.folders) {
+        meetingsData.folders = [];
+      }
+      
+      const newFolder = {
+        id: 'folder-' + Date.now(),
+        name: name,
+        color: color,
+        createdAt: new Date().toISOString(),
+        noteCount: 0
+      };
+      
+      meetingsData.folders.push(newFolder);
+      await fileOperationManager.writeData(meetingsData);
+      
+      return { success: true, folder: newFolder };
+    } catch (error) {
+      console.error('Error creating folder:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Update folder (rename, change color)
+  updateFolder: async function(folderId, updates) {
+    try {
+      const meetingsData = await fileOperationManager.readMeetingsData();
+      
+      if (!meetingsData.folders) {
+        return { success: false, error: 'No folders found' };
+      }
+      
+      const folderIndex = meetingsData.folders.findIndex(f => f.id === folderId);
+      if (folderIndex === -1) {
+        return { success: false, error: 'Folder not found' };
+      }
+      
+      // Update folder properties
+      meetingsData.folders[folderIndex] = {
+        ...meetingsData.folders[folderIndex],
+        ...updates
+      };
+      
+      await fileOperationManager.writeData(meetingsData);
+      return { success: true, folder: meetingsData.folders[folderIndex] };
+    } catch (error) {
+      console.error('Error updating folder:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Delete folder (moves all notes back to inbox)
+  deleteFolder: async function(folderId) {
+    try {
+      const meetingsData = await fileOperationManager.readMeetingsData();
+      
+      if (!meetingsData.folders) {
+        return { success: false, error: 'No folders found' };
+      }
+      
+      const folderIndex = meetingsData.folders.findIndex(f => f.id === folderId);
+      if (folderIndex === -1) {
+        return { success: false, error: 'Folder not found' };
+      }
+      
+      // Move all notes in this folder back to inbox (folderId: null)
+      const allMeetings = [...(meetingsData.pastMeetings || []), ...(meetingsData.upcomingMeetings || [])];
+      allMeetings.forEach(meeting => {
+        if (meeting.folderId === folderId) {
+          meeting.folderId = null;
+        }
+      });
+      
+      // Remove the folder
+      meetingsData.folders.splice(folderIndex, 1);
+      
+      await fileOperationManager.writeData(meetingsData);
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting folder:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Move note to folder
+  moveNoteToFolder: async function(noteId, folderId) {
+    try {
+      const meetingsData = await fileOperationManager.readMeetingsData();
+      
+      // Find the note in both past and upcoming meetings
+      let note = meetingsData.pastMeetings?.find(m => m.id === noteId);
+      let noteArray = 'pastMeetings';
+      
+      if (!note) {
+        note = meetingsData.upcomingMeetings?.find(m => m.id === noteId);
+        noteArray = 'upcomingMeetings';
+      }
+      
+      if (!note) {
+        return { success: false, error: 'Note not found' };
+      }
+      
+      // Update the note's folderId
+      note.folderId = folderId;
+      
+      await fileOperationManager.writeData(meetingsData);
+      return { success: true };
+    } catch (error) {
+      console.error('Error moving note to folder:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Get all folders
+  getFolders: async function() {
+    try {
+      const meetingsData = await fileOperationManager.readMeetingsData();
+      return { success: true, folders: meetingsData.folders || [] };
+    } catch (error) {
+      console.error('Error getting folders:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Update folder note counts
+  updateFolderCounts: async function() {
+    try {
+      const meetingsData = await fileOperationManager.readMeetingsData();
+      
+      if (!meetingsData.folders) {
+        return { success: true };
+      }
+      
+      // Reset all counts
+      meetingsData.folders.forEach(folder => {
+        folder.noteCount = 0;
+      });
+      
+      // Count notes in each folder
+      const allMeetings = [...(meetingsData.pastMeetings || []), ...(meetingsData.upcomingMeetings || [])];
+      allMeetings.forEach(meeting => {
+        if (meeting.folderId) {
+          const folder = meetingsData.folders.find(f => f.id === meeting.folderId);
+          if (folder) {
+            folder.noteCount++;
+          }
+        }
+      });
+      
+      await fileOperationManager.writeData(meetingsData);
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating folder counts:', error);
+      return { success: false, error: error.message };
+    }
   }
 };
 
@@ -1116,6 +1285,67 @@ ipcMain.handle('loadMeetingsData', async () => {
   }
 });
 
+// Folder management IPC handlers
+ipcMain.handle('createFolder', async (event, name, color) => {
+  try {
+    const result = await folderManager.createFolder(name, color);
+    return result;
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('updateFolder', async (event, folderId, updates) => {
+  try {
+    const result = await folderManager.updateFolder(folderId, updates);
+    return result;
+  } catch (error) {
+    console.error('Error updating folder:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('deleteFolder', async (event, folderId) => {
+  try {
+    const result = await folderManager.deleteFolder(folderId);
+    return result;
+  } catch (error) {
+    console.error('Error deleting folder:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('moveNoteToFolder', async (event, noteId, folderId) => {
+  try {
+    const result = await folderManager.moveNoteToFolder(noteId, folderId);
+    return result;
+  } catch (error) {
+    console.error('Error moving note to folder:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('getFolders', async () => {
+  try {
+    const result = await folderManager.getFolders();
+    return result;
+  } catch (error) {
+    console.error('Error getting folders:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('updateFolderCounts', async () => {
+  try {
+    const result = await folderManager.updateFolderCounts();
+    return result;
+  } catch (error) {
+    console.error('Error updating folder counts:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Function to create a new meeting note and start recording
 async function createMeetingNoteAndRecord(platformName) {
   console.log("Creating meeting note for platform:", platformName);
@@ -1137,7 +1367,11 @@ async function createMeetingNoteAndRecord(platformName) {
       meetingsData = JSON.parse(fileData);
     } catch (error) {
       console.error('Error reading meetings data:', error);
-      meetingsData = { upcomingMeetings: [], pastMeetings: [] };
+      meetingsData = { 
+        upcomingMeetings: [], 
+        pastMeetings: [],
+        folders: []
+      };
     }
 
     // Generate a unique ID for the new meeting
@@ -1161,7 +1395,8 @@ async function createMeetingNoteAndRecord(platformName) {
       content: template,
       recordingId: detectedMeeting.window.id,
       platform: platformName,
-      transcript: [] // Initialize an empty array for transcript data
+      transcript: [], // Initialize an empty array for transcript data
+      folderId: null // New notes start in inbox (no folder)
     };
 
     // Update the active meeting tracking with the note ID
