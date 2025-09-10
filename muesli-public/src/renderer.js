@@ -716,6 +716,11 @@ function createMeetingCard(meeting) {
       ${subtitleHtml}
     </div>
     <div class="meeting-actions">
+      <button class="move-to-folder-btn" data-id="${meeting.id}" title="Move to folder">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z" fill="currentColor"/>
+        </svg>
+      </button>
       <button class="delete-meeting-btn" data-id="${meeting.id}" title="Delete note">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
@@ -1132,6 +1137,10 @@ async function moveNoteToFolder(noteId, folderId) {
       if (meeting) {
         meeting.folderId = folderId;
       }
+      
+      // Update folder counts in the UI
+      updateFolderCounts();
+      
       console.log('Moved note to folder:', noteId, folderId);
       return true;
     } else {
@@ -1161,6 +1170,362 @@ function setCurrentFolder(folderId) {
   console.log('Set current folder to:', folderId);
   // Re-render meetings to show only notes in this folder
   renderMeetings();
+}
+
+// Folder UI Functions
+function renderFolderSidebar() {
+  const folderList = document.querySelector('.folder-list');
+  if (!folderList) return;
+
+  // Clear existing folders (except inbox)
+  const existingFolders = folderList.querySelectorAll('.folder-item:not(.inbox-folder)');
+  existingFolders.forEach(folder => folder.remove());
+
+  // Add dynamic folders
+  folders.forEach(folder => {
+    const folderItem = document.createElement('div');
+    folderItem.className = 'folder-item';
+    folderItem.setAttribute('data-folder-id', folder.id);
+    
+    folderItem.innerHTML = `
+      <div class="folder-icon" style="color: ${folder.color};">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="folder-info">
+        <span class="folder-name">${folder.name}</span>
+        <div class="folder-actions-inline">
+          <span class="folder-count">0</span>
+          <button class="folder-delete-btn" data-folder-id="${folder.id}" title="Delete folder">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Add click handler for folder selection (but not on delete button)
+    folderItem.addEventListener('click', (e) => {
+      // Don't select folder if clicking the delete button
+      if (!e.target.closest('.folder-delete-btn')) {
+        setCurrentFolder(folder.id);
+        updateFolderSelection(folder.id);
+      }
+    });
+
+    // Add delete button handler
+    const deleteBtn = folderItem.querySelector('.folder-delete-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async (e) => {
+        e.stopPropagation(); // Prevent folder selection
+        await handleFolderDelete(folder.id, folder.name);
+      });
+    }
+
+    folderList.appendChild(folderItem);
+  });
+
+  // Update inbox count
+  updateInboxCount();
+}
+
+function createInlineFolder() {
+  const folderList = document.querySelector('.folder-list');
+  if (!folderList) return;
+
+  // Check if there's already an editing folder
+  const existingEditingFolder = folderList.querySelector('.folder-item.editing');
+  if (existingEditingFolder) {
+    return; // Don't create another one if already editing
+  }
+
+  // Create new folder item with editable input
+  const folderItem = document.createElement('div');
+  folderItem.className = 'folder-item editing';
+  folderItem.setAttribute('data-folder-id', 'temp-new-folder');
+  
+  folderItem.innerHTML = `
+    <div class="folder-icon" style="color: #3B82F6;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z" fill="currentColor"/>
+      </svg>
+    </div>
+    <div class="folder-info">
+      <input type="text" class="folder-name-input" placeholder="Folder name" maxlength="50">
+      <span class="folder-count">0</span>
+    </div>
+  `;
+
+  // Add to the end of the folder list
+  folderList.appendChild(folderItem);
+
+  // Focus the input field
+  const input = folderItem.querySelector('.folder-name-input');
+  if (input) {
+    input.focus();
+
+    let isSaving = false; // Flag to prevent double saving
+
+    // Handle Enter key to save
+    input.addEventListener('keypress', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!isSaving) {
+          isSaving = true;
+          await saveInlineFolder(folderItem, input.value.trim());
+        }
+      }
+    });
+
+    // Handle Escape key to cancel
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        cancelInlineFolder(folderItem);
+      }
+    });
+
+    // Handle blur (clicking outside) to save
+    input.addEventListener('blur', async () => {
+      // Only save on blur if we haven't already started saving
+      if (!isSaving) {
+        const name = input.value.trim();
+        if (name) {
+          isSaving = true;
+          await saveInlineFolder(folderItem, name);
+        } else {
+          cancelInlineFolder(folderItem);
+        }
+      }
+    });
+  }
+}
+
+async function saveInlineFolder(folderItem, name) {
+  if (!name) {
+    cancelInlineFolder(folderItem);
+    return;
+  }
+
+  // Create the folder using existing logic
+  const newFolder = await createFolder(name, '#3B82F6');
+  if (newFolder) {
+    // Remove the temporary editing folder and re-render
+    folderItem.remove();
+    renderFolderSidebar();
+    updateFolderCounts(); // Update counts after creating new folder
+    console.log('Created new folder:', newFolder);
+  } else {
+    // If creation failed, keep the input for user to try again
+    const input = folderItem.querySelector('.folder-name-input');
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }
+}
+
+function cancelInlineFolder(folderItem) {
+  // Simply remove the temporary editing folder
+  folderItem.remove();
+}
+
+async function handleFolderDelete(folderId, folderName) {
+  // Show confirmation dialog
+  const confirmDelete = confirm(`Are you sure you want to delete the folder "${folderName}"?\n\nAll notes in this folder will be moved to your Inbox.`);
+  
+  if (!confirmDelete) {
+    return;
+  }
+
+  try {
+    const result = await deleteFolder(folderId);
+    if (result) {
+      // Update local data - move notes back to inbox
+      const allMeetings = [...upcomingMeetings, ...pastMeetings];
+      allMeetings.forEach(meeting => {
+        if (meeting.folderId === folderId) {
+          meeting.folderId = null;
+        }
+      });
+
+      // If we're currently viewing the deleted folder, switch to inbox
+      if (currentFolderId === folderId) {
+        setCurrentFolder(null);
+        updateFolderSelection(null);
+      }
+
+      // Re-render the sidebar and update counts
+      renderFolderSidebar();
+      updateFolderCounts(); // Recalculate counts after re-rendering
+      renderMeetings(); // Refresh the meeting list
+      
+      console.log(`Deleted folder "${folderName}" and moved notes to inbox`);
+    } else {
+      alert('Failed to delete folder. Please try again.');
+    }
+  } catch (error) {
+    console.error('Error deleting folder:', error);
+    alert('An error occurred while deleting the folder.');
+  }
+}
+
+function updateFolderSelection(selectedFolderId) {
+  // Remove active class from all folders
+  document.querySelectorAll('.folder-item').forEach(item => {
+    item.classList.remove('active');
+  });
+
+  // Add active class to selected folder
+  const selectedFolder = document.querySelector(`[data-folder-id="${selectedFolderId}"]`);
+  if (selectedFolder) {
+    selectedFolder.classList.add('active');
+  }
+}
+
+function updateInboxCount() {
+  const inboxCount = document.getElementById('inboxCount');
+  if (inboxCount) {
+    // Get all notes, not just current folder
+    const allMeetings = [...upcomingMeetings, ...pastMeetings];
+    const inboxNotes = allMeetings.filter(meeting => !meeting.folderId);
+    inboxCount.textContent = inboxNotes.length;
+  }
+}
+
+function updateFolderCounts() {
+  // Get all notes, not just current folder
+  const allMeetings = [...upcomingMeetings, ...pastMeetings];
+  
+  // Update all folder counts
+  folders.forEach(folder => {
+    const folderNotes = allMeetings.filter(meeting => meeting.folderId === folder.id);
+    const folderElement = document.querySelector(`[data-folder-id="${folder.id}"] .folder-count`);
+    if (folderElement) {
+      folderElement.textContent = folderNotes.length;
+    }
+  });
+
+  // Update inbox count
+  updateInboxCount();
+}
+
+function openFolderSidebar() {
+  const folderSidebar = document.getElementById('folderSidebar');
+  if (folderSidebar) {
+    folderSidebar.style.display = 'flex';
+    renderFolderSidebar();
+    // Update folder counts after rendering the sidebar
+    updateFolderCounts();
+  }
+}
+
+function closeFolderSidebar() {
+  const folderSidebar = document.getElementById('folderSidebar');
+  if (folderSidebar) {
+    folderSidebar.style.display = 'none';
+  }
+}
+
+function openFolderModal() {
+  const folderModal = document.getElementById('folderModal');
+  if (folderModal) {
+    folderModal.style.display = 'flex';
+    document.getElementById('folderName').focus();
+  }
+}
+
+function closeFolderModal() {
+  const folderModal = document.getElementById('folderModal');
+  if (folderModal) {
+    folderModal.style.display = 'none';
+    document.getElementById('folderForm').reset();
+  }
+}
+
+async function createNewFolder() {
+  const name = document.getElementById('folderName').value.trim();
+  const color = document.querySelector('input[name="folderColor"]:checked').value;
+
+  if (!name) {
+    alert('Please enter a folder name');
+    return;
+  }
+
+  const newFolder = await createFolder(name, color);
+  if (newFolder) {
+    renderFolderSidebar();
+    updateFolderCounts(); // Update counts after creating new folder
+    closeFolderModal();
+    console.log('Created new folder:', newFolder);
+  }
+}
+
+function showFolderSelectionDropdown(noteId) {
+  // Create dropdown menu
+  const dropdown = document.createElement('div');
+  dropdown.className = 'folder-dropdown';
+  dropdown.innerHTML = `
+    <div class="folder-dropdown-content">
+      <div class="folder-dropdown-header">Move to folder</div>
+      <div class="folder-dropdown-item" data-folder-id="null">
+        <div class="folder-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 6H4L2 8v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8l-2-2z" fill="currentColor"/>
+          </svg>
+        </div>
+        <span>Inbox</span>
+      </div>
+      ${folders.map(folder => `
+        <div class="folder-dropdown-item" data-folder-id="${folder.id}">
+          <div class="folder-icon" style="color: ${folder.color};">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z" fill="currentColor"/>
+            </svg>
+          </div>
+          <span>${folder.name}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // Position dropdown near the button
+  const button = document.querySelector(`[data-id="${noteId}"] .move-to-folder-btn`);
+  const rect = button.getBoundingClientRect();
+  dropdown.style.position = 'fixed';
+  dropdown.style.top = `${rect.bottom + 5}px`;
+  dropdown.style.left = `${rect.left}px`;
+  dropdown.style.zIndex = '1000';
+
+  // Add click handlers
+  dropdown.querySelectorAll('.folder-dropdown-item').forEach(item => {
+    item.addEventListener('click', async () => {
+      const folderId = item.dataset.folderId === 'null' ? null : item.dataset.folderId;
+      await moveNoteToFolder(noteId, folderId);
+      if (dropdown.parentNode) {
+        document.body.removeChild(dropdown);
+      }
+      document.removeEventListener('click', closeDropdown);
+      renderMeetings(); // Refresh the view
+    });
+  });
+
+  // Close dropdown when clicking outside
+  const closeDropdown = (e) => {
+    if (!dropdown.contains(e.target)) {
+      if (dropdown.parentNode) {
+        document.body.removeChild(dropdown);
+      }
+      document.removeEventListener('click', closeDropdown);
+    }
+  };
+
+  setTimeout(() => {
+    document.addEventListener('click', closeDropdown);
+  }, 0);
+
+  document.body.appendChild(dropdown);
 }
 
 // Function to render meetings to the page
@@ -1293,11 +1658,17 @@ async function loadMeetingsDataFromFile() {
 
       console.log('Meetings data loaded from file');
 
-      // Load folders
+      // Load folders and wait for completion
       await loadFolders();
-
+      
       // Re-render the meetings
       renderMeetings();
+      
+      // Update folder counts after folders are loaded
+      updateFolderCounts();
+      
+      // Re-render folder sidebar with updated counts
+      renderFolderSidebar();
     } else {
       console.error('Failed to load meetings data from file:', result.error);
     }
@@ -2199,6 +2570,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Render meetings only after loading from file
   console.log('Data loaded, rendering meetings...');
   renderMeetings();
+  
+  // Update folder counts on initial load (especially inbox count)
+  updateFolderCounts();
 
   // Initially show home view
   showHomeView();
@@ -2584,6 +2958,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       e.preventDefault();
       e.stopPropagation();
       showLessNotes();
+      return;
+    }
+    
+    // Check if move to folder button was clicked
+    if (e.target.closest('.move-to-folder-btn')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const meetingId = e.target.closest('.move-to-folder-btn').dataset.id;
+      showFolderSelectionDropdown(meetingId);
       return;
     }
     
@@ -3342,6 +3725,75 @@ function initUniversalChat() {
       }
     });
   });
+
+  // Folder system event listeners
+  const folderBtn = document.getElementById('folderBtn');
+  const folderCloseBtn = document.getElementById('folderCloseBtn');
+  const folderCreateBtn = document.getElementById('folderCreateBtn');
+  const folderModal = document.getElementById('folderModal');
+  const folderModalCloseBtn = document.getElementById('folderModalCloseBtn');
+  const folderModalCancelBtn = document.getElementById('folderModalCancelBtn');
+  const folderModalSaveBtn = document.getElementById('folderModalSaveBtn');
+
+  // Open folder sidebar
+  if (folderBtn) {
+    folderBtn.addEventListener('click', openFolderSidebar);
+  }
+
+  // Close folder sidebar
+  if (folderCloseBtn) {
+    folderCloseBtn.addEventListener('click', closeFolderSidebar);
+  }
+
+  // Create folder inline
+  if (folderCreateBtn) {
+    folderCreateBtn.addEventListener('click', createInlineFolder);
+  }
+
+  // Close folder modal
+  if (folderModalCloseBtn) {
+    folderModalCloseBtn.addEventListener('click', closeFolderModal);
+  }
+
+  if (folderModalCancelBtn) {
+    folderModalCancelBtn.addEventListener('click', closeFolderModal);
+  }
+
+  // Close modal when clicking outside
+  if (folderModal) {
+    folderModal.addEventListener('click', (e) => {
+      if (e.target === folderModal) {
+        closeFolderModal();
+      }
+    });
+  }
+
+  // Create new folder
+  if (folderModalSaveBtn) {
+    folderModalSaveBtn.addEventListener('click', createNewFolder);
+  }
+
+  // Handle Enter key in folder name input
+  const folderNameInput = document.getElementById('folderName');
+  if (folderNameInput) {
+    folderNameInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        createNewFolder();
+      }
+    });
+  }
+
+  // Initialize folder selection (inbox by default)
+  updateFolderSelection(null);
+
+  // Add click handler for inbox folder
+  const inboxFolder = document.querySelector('.inbox-folder');
+  if (inboxFolder) {
+    inboxFolder.addEventListener('click', () => {
+      setCurrentFolder(null);
+      updateFolderSelection(null);
+    });
+  }
 
 }
 
