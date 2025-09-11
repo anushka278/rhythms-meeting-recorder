@@ -8,7 +8,27 @@ const OpenAI = require('openai');
 const sdkLogger = require('./sdk-logger');
 const GoogleCalendarService = require('./googleCalendar');
 const PDFGenerator = require('./pdfGenerator');
-require('dotenv').config();
+// Load environment variables - handle both development and packaged app
+const dotenv = require('dotenv');
+const isDev = !app.isPackaged;
+
+if (isDev) {
+  // In development, load from project root
+  dotenv.config();
+} else {
+  // In packaged app, try to load from app directory
+  const envPath = path.join(process.resourcesPath, '.env');
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+  } else {
+    // Also try loading from the same directory as the app
+    const appDir = path.dirname(process.execPath);
+    const altEnvPath = path.join(appDir, '.env');
+    if (fs.existsSync(altEnvPath)) {
+      dotenv.config({ path: altEnvPath });
+    }
+  }
+}
 
 // Function to get the OpenRouter headers
 function getHeaderLines() {
@@ -18,15 +38,28 @@ function getHeaderLines() {
   ];
 }
 
-// Initialize OpenAI client with OpenRouter as the base URL
-const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_KEY,
-  defaultHeaders: {
-    "HTTP-Referer": "https://recall.ai",
-    "X-Title": "Muesli AI Notetaker"
+// Initialize OpenAI client lazily to handle missing environment variables
+let openai = null;
+
+function getOpenAIClient() {
+  if (!openai) {
+    const apiKey = process.env.OPENROUTER_KEY;
+    if (!apiKey) {
+      console.error('OPENROUTER_KEY environment variable is not set');
+      return null;
+    }
+    
+    openai = new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: apiKey,
+      defaultHeaders: {
+        "HTTP-Referer": "https://recall.ai",
+        "X-Title": "Muesli AI Notetaker"
+      }
+    });
   }
-});
+  return openai;
+}
 
 // Define available models with their capabilities
 const MODELS = {
@@ -1810,7 +1843,11 @@ ${transcriptText}` }
     // If no progress callback provided, use the non-streaming version
     if (!progressCallback) {
       // Call the OpenAI API (via OpenRouter) for summarization (non-streaming)
-      const response = await openai.chat.completions.create({
+      const client = getOpenAIClient();
+      if (!client) {
+        throw new Error('OpenAI client not available - OPENROUTER_KEY not set');
+      }
+      const response = await client.chat.completions.create({
         model: MODELS.PRIMARY, // Use our primary model for a good balance of quality and speed
         messages: messages,
         max_tokens: 1000,
@@ -1830,7 +1867,11 @@ ${transcriptText}` }
       let fullText = '';
 
       // Create a streaming request
-      const stream = await openai.chat.completions.create({
+      const client = getOpenAIClient();
+      if (!client) {
+        throw new Error('OpenAI client not available - OPENROUTER_KEY not set');
+      }
+      const stream = await client.chat.completions.create({
         model: MODELS.PRIMARY, // Use our primary model for a good balance of quality and speed
         messages: messages,
         max_tokens: 1000,
@@ -2316,7 +2357,11 @@ Content: ${meeting.content || meeting.summary || 'No content available'}
 
     console.log('Universal chat - Sending request to AI with context length:', allNotesContent.length);
     
-    const response = await openai.chat.completions.create({
+    const client = getOpenAIClient();
+    if (!client) {
+      throw new Error('OpenAI client not available - OPENROUTER_KEY not set');
+    }
+    const response = await client.chat.completions.create({
       model: MODELS.PRIMARY,
       messages: messages,
       max_tokens: 800,

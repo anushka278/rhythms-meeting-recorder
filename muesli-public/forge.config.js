@@ -6,17 +6,20 @@ module.exports = {
     asar: {
       unpackDir: "node_modules/@recallai"
     },
-    osxSign: {
-      continueOnError: false,
-      optionsForFile: (_) => {
-        // Here, we keep it simple and return a single entitlements.plist file.
-        // You can use this callback to map different sets of entitlements
-        // to specific files in your packaged app.
-        return {
-          entitlements: './Entitlements.plist'
-        };
-      }
-    },
+    extraResource: [
+      ".env"
+    ],
+    // Disable code signing - will sign manually after packaging
+    // osxSign: {
+    //   identity: '-', // Ad-hoc signing
+    //   continueOnError: false,
+    //   optionsForFile: (_) => {
+    //     return {
+    //       entitlements: './Entitlements.plist',
+    //       'hardened-runtime': false // Required for ad-hoc signing
+    //     };
+    //   }
+    // },
     icon: './muesli',
     appBundleId: 'com.muesli.app',
     extendInfo: {

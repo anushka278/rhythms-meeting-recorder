@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(npm run make:*)",
+      "Bash(open:*)",
+      "Read(/Volumes/**)",
+      "Read(/Volumes/Muesli 1.0.0/**)",
+      "Bash(hdiutil detach:*)",
+      "Read(/var/folders/6k/mlfr0wh50_18y2d3pcxdrm640000gn/T/TemporaryItems/NSIRD_screencaptureui_lo0s2X/**)",
+      "Bash(codesign:*)",
+      "Bash(security find-identity:*)",
+      "Bash(security create-certificate:*)",
+      "Bash(security:*)",
+      "Bash(npm run package:*)",
+      "Bash(npx electron-forge make:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
