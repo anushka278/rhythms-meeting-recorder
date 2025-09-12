@@ -34,7 +34,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMeetingDetectionStatus: (callback) => ipcRenderer.on('meeting-detection-status', (_, data) => callback(data)),
   getActiveRecordingId: (noteId) => ipcRenderer.invoke('getActiveRecordingId', noteId),
   
-  // Google Calendar APIs
+  // Google Calendar OAuth APIs
+  getGoogleOAuthStatus: () => ipcRenderer.invoke('google-oauth-status'),
+  startGoogleOAuth: () => ipcRenderer.invoke('google-oauth-start'),
+  disconnectGoogleOAuth: () => ipcRenderer.invoke('google-oauth-disconnect'),
+  testGoogleCalendar: () => ipcRenderer.invoke('google-calendar-test'),
+  
+  // Legacy Google Calendar APIs (for backward compatibility)
   initializeGoogleCalendar: () => ipcRenderer.invoke('initializeGoogleCalendar'),
   getGoogleAuthUrl: () => ipcRenderer.invoke('getGoogleAuthUrl'),
   authorizeGoogleCalendar: (code) => ipcRenderer.invoke('authorizeGoogleCalendar', code),

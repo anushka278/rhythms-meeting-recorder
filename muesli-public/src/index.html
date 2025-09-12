@@ -74,12 +74,27 @@
             <section class="meetings-section" id="upcoming-section">
               <div class="section-header">
                 <h2 class="section-title">Upcoming Meetings</h2>
-                <button class="btn connect-calendar-btn" id="connectCalendarBtn" style="display: none;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" fill="currentColor"/>
-                  </svg>
-                  Connect Google Calendar
-                </button>
+                <div class="calendar-connection-status" id="calendarStatus" style="display: flex; align-items: center; gap: 8px;">
+                  <button class="btn connect-calendar-btn" id="connectCalendarBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" fill="currentColor"/>
+                    </svg>
+                    Connect Google Calendar
+                  </button>
+                  <button class="btn disconnect-calendar-btn" id="disconnectCalendarBtn" style="display: none;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="currentColor"/>
+                    </svg>
+                    Disconnect
+                  </button>
+                  <button class="btn test-calendar-btn" id="testCalendarBtn" style="display: none;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" fill="none"/>
+                    </svg>
+                    Test Connection
+                  </button>
+                  <span class="status-indicator" id="connectionStatus" style="display: none;"></span>
+                </div>
               </div>
               <div class="meetings-list" id="upcoming-meetings-list">
                 <!-- Upcoming meetings will be inserted here -->
@@ -88,7 +103,10 @@
                     <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" fill="#999"/>
                   </svg>
                   <p>No upcoming meetings</p>
-                  <button class="btn connect-btn-large" id="connectCalendarBtnLarge">Connect Google Calendar</button>
+                  <div id="emptyStateButtons">
+                    <button class="btn connect-btn-large" id="connectCalendarBtnLarge">Connect Google Calendar</button>
+                    <div class="oauth-result" id="emptyStateResult" style="display: none; margin-top: 10px; font-size: 14px;"></div>
+                  </div>
                 </div>
               </div>
               <button class="btn more-btn" id="moreUpcomingBtn" style="display: none;">Show More</button>

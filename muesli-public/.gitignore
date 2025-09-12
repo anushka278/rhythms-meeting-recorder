@@ -94,3 +94,5 @@ out/
 # Credential files
 credentials.json
 credentials_updated.json
+credentials_updated.json
+../credentials_updated.json

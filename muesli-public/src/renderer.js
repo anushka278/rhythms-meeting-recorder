@@ -346,12 +346,12 @@ async function checkGoogleCalendarAuth() {
       console.log('Google Calendar is authenticated');
       googleCalendarConnected = true;
       await loadUpcomingMeetings();
-      updateCalendarButtonVisibility();
+      // OAuth status will be updated later after functions are defined
     } else {
       console.log('Google Calendar is not authenticated');
       googleCalendarConnected = false;
       showEmptyUpcomingState();
-      updateCalendarButtonVisibility();
+      // OAuth status will be updated later after functions are defined
     }
   } catch (error) {
     console.error('Error checking Google Calendar auth:', error);
@@ -382,7 +382,7 @@ async function connectGoogleCalendar() {
       console.log('Google Calendar connected successfully!');
       googleCalendarConnected = true;
       await loadUpcomingMeetings();
-      updateCalendarButtonVisibility();
+      // OAuth status will be updated later after functions are defined
       
       // Show success message
       const emptyState = document.getElementById('upcoming-empty-state');
@@ -2596,13 +2596,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const authModalSubmit = document.getElementById('authModalSubmit');
   const authCodeInput = document.getElementById('authCodeInput');
 
-  if (connectBtn) {
-    connectBtn.addEventListener('click', connectGoogleCalendar);
-  }
-
-  if (connectBtnLarge) {
-    connectBtnLarge.addEventListener('click', connectGoogleCalendar);
-  }
+  // Connect button event listeners are set up later after function definitions
 
   if (moreUpcomingBtn) {
     moreUpcomingBtn.addEventListener('click', () => {
@@ -2629,7 +2623,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             authCodeInput.value = '';
             googleCalendarConnected = true;
             await loadUpcomingMeetings();
-            updateCalendarButtonVisibility();
+            // OAuth status will be updated later after functions are defined
           } else {
             alert('Authorization failed. Please try again.');
           }
@@ -3794,6 +3788,210 @@ function initUniversalChat() {
       updateFolderSelection(null);
     });
   }
+
+  // Google OAuth functions
+  async function updateOAuthStatus() {
+    try {
+      // Try new OAuth status first, fall back to legacy method
+      let isAuthenticated = false;
+      
+      if (window.electronAPI.getGoogleOAuthStatus) {
+        const result = await window.electronAPI.getGoogleOAuthStatus();
+        isAuthenticated = result.success && result.isAuthenticated;
+      } else if (window.electronAPI.isGoogleCalendarAuthenticated) {
+        // Fall back to legacy method
+        isAuthenticated = await window.electronAPI.isGoogleCalendarAuthenticated();
+      }
+      
+      // Update button visibility
+      const connectBtn = document.getElementById('connectCalendarBtn');
+      const disconnectBtn = document.getElementById('disconnectCalendarBtn');
+      const testBtn = document.getElementById('testCalendarBtn');
+      const status = document.getElementById('connectionStatus');
+      const largeBtnDiv = document.getElementById('emptyStateButtons');
+      const largeBtn = document.getElementById('connectCalendarBtnLarge');
+      
+      if (isAuthenticated) {
+        if (connectBtn) connectBtn.style.display = 'none';
+        if (disconnectBtn) disconnectBtn.style.display = 'inline-flex';
+        if (testBtn) testBtn.style.display = 'inline-flex';
+        if (status) {
+          status.style.display = 'inline';
+          status.textContent = '✓ Connected';
+          status.style.color = '#10B981';
+        }
+        if (largeBtn) largeBtn.textContent = '✓ Connected to Google Calendar';
+        googleCalendarConnected = true;
+      } else {
+        if (connectBtn) connectBtn.style.display = 'inline-flex';
+        if (disconnectBtn) disconnectBtn.style.display = 'none';
+        if (testBtn) testBtn.style.display = 'none';
+        if (status) status.style.display = 'none';
+        if (largeBtn) largeBtn.textContent = 'Connect Google Calendar';
+        googleCalendarConnected = false;
+      }
+    } catch (error) {
+      console.error('Error checking OAuth status:', error);
+    }
+  }
+
+  async function startGoogleOAuth() {
+    try {
+      const statusDiv = document.getElementById('connectionStatus');
+      const resultDiv = document.getElementById('emptyStateResult');
+      
+      // Show loading
+      if (statusDiv) {
+        statusDiv.style.display = 'inline';
+        statusDiv.textContent = 'Connecting...';
+        statusDiv.style.color = '#6B7280';
+      }
+      if (resultDiv) {
+        resultDiv.style.display = 'block';
+        resultDiv.textContent = 'Opening Google authorization...';
+        resultDiv.style.color = '#6B7280';
+      }
+      
+      const result = await window.electronAPI.startGoogleOAuth();
+      
+      if (result.success) {
+        if (statusDiv) {
+          statusDiv.textContent = '✓ Connected';
+          statusDiv.style.color = '#10B981';
+        }
+        if (resultDiv) {
+          resultDiv.textContent = '✓ Successfully connected to Google Calendar!';
+          resultDiv.style.color = '#10B981';
+          setTimeout(() => {
+            resultDiv.style.display = 'none';
+          }, 3000);
+        }
+        // OAuth status will be updated later after functions are defined
+        // Refresh meetings if connected
+        await loadUpcomingMeetings();
+      } else {
+        const errorMsg = result.error || 'Failed to connect';
+        if (statusDiv) {
+          statusDiv.textContent = '✗ Failed';
+          statusDiv.style.color = '#EF4444';
+        }
+        if (resultDiv) {
+          resultDiv.textContent = `✗ ${errorMsg}`;
+          resultDiv.style.color = '#EF4444';
+        }
+        console.error('OAuth failed:', result.error);
+      }
+    } catch (error) {
+      console.error('OAuth error:', error);
+      const statusDiv = document.getElementById('connectionStatus');
+      const resultDiv = document.getElementById('emptyStateResult');
+      if (statusDiv) {
+        statusDiv.textContent = '✗ Error';
+        statusDiv.style.color = '#EF4444';
+      }
+      if (resultDiv) {
+        resultDiv.textContent = '✗ Connection failed';
+        resultDiv.style.color = '#EF4444';
+      }
+    }
+  }
+
+  async function disconnectGoogleOAuth() {
+    try {
+      let result;
+      
+      // Try new disconnect method first
+      if (window.electronAPI.disconnectGoogleOAuth) {
+        result = await window.electronAPI.disconnectGoogleOAuth();
+      } else if (window.electronAPI.revokeGoogleCalendarAuth) {
+        // Fallback to legacy method
+        result = await window.electronAPI.revokeGoogleCalendarAuth();
+        result = { success: result }; // Normalize response
+      }
+      
+      if (result && result.success) {
+        // OAuth status will be updated later after functions are defined
+        showEmptyUpcomingState(); // Show empty state after disconnect
+      } else {
+        console.error('Disconnect failed:', result?.error);
+      }
+    } catch (error) {
+      console.error('Disconnect error:', error);
+    }
+  }
+
+  async function testGoogleCalendar() {
+    try {
+      const statusDiv = document.getElementById('connectionStatus');
+      const resultDiv = document.getElementById('emptyStateResult');
+      
+      // Show testing
+      if (statusDiv) {
+        statusDiv.textContent = 'Testing...';
+        statusDiv.style.color = '#6B7280';
+      }
+      
+      const result = await window.electronAPI.testGoogleCalendar();
+      
+      if (result.success) {
+        const eventCount = result.events ? result.events.length : 0;
+        if (statusDiv) {
+          statusDiv.textContent = `✓ Found ${eventCount} events`;
+          statusDiv.style.color = '#10B981';
+        }
+        if (resultDiv) {
+          resultDiv.style.display = 'block';
+          resultDiv.textContent = `✓ Connection working! Found ${eventCount} upcoming events.`;
+          resultDiv.style.color = '#10B981';
+          setTimeout(() => {
+            resultDiv.style.display = 'none';
+          }, 3000);
+        }
+        console.log('Calendar test successful:', result.events);
+      } else {
+        if (statusDiv) {
+          statusDiv.textContent = '✗ Test failed';
+          statusDiv.style.color = '#EF4444';
+        }
+        if (resultDiv) {
+          resultDiv.style.display = 'block';
+          resultDiv.textContent = `✗ Test failed: ${result.error}`;
+          resultDiv.style.color = '#EF4444';
+        }
+        console.error('Calendar test failed:', result.error);
+      }
+      
+      // Reset status after a delay
+      setTimeout(async () => {
+        // OAuth status will be updated later after functions are defined
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Test error:', error);
+    }
+  }
+
+  // Add event listeners for OAuth buttons
+  const connectBtn = document.getElementById('connectCalendarBtn');
+  const connectBtnLarge = document.getElementById('connectCalendarBtnLarge');
+  const disconnectBtn = document.getElementById('disconnectCalendarBtn');
+  const testBtn = document.getElementById('testCalendarBtn');
+  
+  if (connectBtn) {
+    connectBtn.addEventListener('click', startGoogleOAuth);
+  }
+  if (connectBtnLarge) {
+    connectBtnLarge.addEventListener('click', startGoogleOAuth);
+  }
+  if (disconnectBtn) {
+    disconnectBtn.addEventListener('click', disconnectGoogleOAuth);
+  }
+  if (testBtn) {
+    testBtn.addEventListener('click', testGoogleCalendar);
+  }
+
+  // Initialize OAuth status on page load
+  updateOAuthStatus();
 
 }
 

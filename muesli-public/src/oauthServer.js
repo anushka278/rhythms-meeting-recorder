@@ -8,8 +8,8 @@ class OAuthCallbackServer {
   }
 
   // Start a temporary server to handle OAuth callback
-  async startServer() {
-    return new Promise((resolve) => {
+  async startServer(preferredPort = 3000) {
+    return new Promise((resolve, reject) => {
       this.server = http.createServer((req, res) => {
         const queryObject = url.parse(req.url, true).query;
         
@@ -135,9 +135,34 @@ class OAuthCallbackServer {
         }
       });
 
-      this.server.listen(3000, 'localhost', () => {
-        console.log('OAuth callback server listening on http://localhost:3000');
-        resolve();
+      // Use the preferred port instead of system-assigned port
+      this.server.listen(preferredPort, 'localhost', () => {
+        const port = this.server.address().port;
+        console.log(`OAuth callback server listening on http://localhost:${port}`);
+        this.port = port;
+        resolve(port);
+      }).on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(`❌ Port ${preferredPort} is already in use!`);
+          console.error(`Please either:`);
+          console.error(`1. Stop the service using port ${preferredPort}`);
+          console.error(`2. Change OAUTH_CALLBACK_PORT in your .env file`);
+          console.error(`3. Kill the process: lsof -ti:${preferredPort} | xargs kill`);
+          reject(new Error(`Port ${preferredPort} is already in use`));
+        } else if (err.code === 'EACCES' && preferredPort === 80) {
+          console.log(`⚠️  Port 80 requires admin privileges. Trying port 8080 instead...`);
+          // Try port 8080 as fallback
+          this.server.listen(8080, 'localhost', () => {
+            const port = this.server.address().port;
+            console.log(`OAuth callback server listening on http://localhost:${port}`);
+            this.port = port;
+            resolve(port);
+          }).on('error', (fallbackErr) => {
+            reject(fallbackErr);
+          });
+        } else {
+          reject(err);
+        }
       });
     });
   }
@@ -159,6 +184,7 @@ class OAuthCallbackServer {
     }
     
     const code = this.authCode;
+    console.log('Auth code received:', code);
     this.authCode = null; // Reset for next use
     return code;
   }

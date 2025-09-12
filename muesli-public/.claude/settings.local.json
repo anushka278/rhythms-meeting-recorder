@@ -13,7 +13,16 @@
       "Bash(security create-certificate:*)",
       "Bash(security:*)",
       "Bash(npm run package:*)",
-      "Bash(npx electron-forge make:*)"
+      "Bash(npx electron-forge make:*)",
+      "Read(/Users/anushkarawat/Library/**)",
+      "Read(/Users/anushkarawat/Library/**)",
+      "Bash(npm start)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Read(/Users/anushkarawat/Library/**)",
+      "Read(/var/folders/6k/mlfr0wh50_18y2d3pcxdrm640000gn/T/TemporaryItems/NSIRD_screencaptureui_pTiT93/**)",
+      "Bash(pkill:*)",
+      "Read(/var/folders/6k/mlfr0wh50_18y2d3pcxdrm640000gn/T/TemporaryItems/NSIRD_screencaptureui_advx8L/**)"
     ],
     "deny": [],
     "ask": []

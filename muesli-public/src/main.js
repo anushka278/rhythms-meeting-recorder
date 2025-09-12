@@ -2154,19 +2154,19 @@ ipcMain.handle('getGoogleAuthUrl', async () => {
       const { shell } = require('electron');
       shell.openExternal(result.authUrl);
       
-      // Wait for the authorization code
-      console.log('Waiting for authorization...');
-      const code = await result.waitForCode();
+      // Wait for tokens from Cloudflare
+      console.log('Waiting for authorization via Cloudflare...');
+      const tokens = await result.waitForCode(); // This now returns tokens, not just a code
       
-      if (code) {
-        // Automatically authorize with the received code
-        const authResult = await googleCalendar.authorize(code);
+      if (tokens) {
+        // Automatically authorize with the received tokens
+        const authResult = await googleCalendar.authorizeWithTokens(tokens);
         return { success: authResult, autoAuthorized: true };
       } else {
         return { success: false, error: 'Authorization timeout or cancelled' };
       }
     }
-    return { success: false, error: 'Could not start auth server' };
+    return { success: false, error: 'Could not start Cloudflare OAuth' };
   } catch (error) {
     console.error('Error getting auth URL:', error);
     return { success: false, error: error.message };
@@ -2376,5 +2376,82 @@ Content: ${meeting.content || meeting.summary || 'No content available'}
   } catch (error) {
     console.error('Error in chatWithAllNotes:', error);
     throw error;
+  }
+});
+
+// Google OAuth IPC Handlers
+ipcMain.handle('google-oauth-status', async () => {
+  try {
+    const isAuthenticated = googleCalendar.isAuthenticated();
+    return { success: true, isAuthenticated };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('google-oauth-start', async () => {
+  try {
+    // Initialize Google Calendar service
+    await googleCalendar.initialize();
+    
+    // Get auth URL with Cloudflare Worker
+    const authResult = await googleCalendar.getAuthUrlWithServer();
+    
+    if (!authResult.success) {
+      return { success: false, error: authResult.error };
+    }
+    
+    console.log('Opening Google OAuth URL:', authResult.authUrl);
+    
+    // Open the auth URL in the user's default browser
+    shell.openExternal(authResult.authUrl);
+    
+    // Wait for tokens from Cloudflare
+    const tokens = await authResult.waitForCode();
+    
+    if (!tokens) {
+      return { success: false, error: 'Authorization timed out or was cancelled' };
+    }
+    
+    // Set credentials with tokens from Cloudflare
+    const success = await googleCalendar.authorizeWithTokens(tokens);
+    
+    if (success) {
+      return { success: true, message: 'Google Calendar connected successfully via Cloudflare!' };
+    } else {
+      return { success: false, error: 'Failed to set credentials with tokens' };
+    }
+    
+  } catch (error) {
+    console.error('Google OAuth failed:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('google-oauth-disconnect', async () => {
+  try {
+    const success = await googleCalendar.revokeAuth();
+    return { success, message: success ? 'Disconnected from Google Calendar' : 'Failed to disconnect' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('google-calendar-test', async () => {
+  try {
+    if (!googleCalendar.isAuthenticated()) {
+      return { success: false, error: 'Not authenticated. Please connect Google Calendar first.' };
+    }
+    
+    const events = await googleCalendar.getUpcomingMeetings(5);
+    
+    return {
+      success: true,
+      events: events,
+      message: `Found ${events.length} upcoming events`
+    };
+  } catch (error) {
+    console.error('Google Calendar test failed:', error);
+    return { success: false, error: error.message };
   }
 });

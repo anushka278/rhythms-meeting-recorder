@@ -17,6 +17,7 @@ class GoogleCalendarService {
   constructor() {
     this.auth = null;
     this.calendar = null;
+    this.callbackServer = null;
   }
 
   // Initialize the OAuth2 client
@@ -33,7 +34,9 @@ class GoogleCalendarService {
       // Support both web and installed app types
       const { client_secret, client_id, redirect_uris } = credentials.web || credentials.installed;
       
-      this.auth = new OAuth2Client(client_id, client_secret, redirect_uris[0]);
+      // Use http://localhost redirect URI instead of urn:ietf:wg:oauth:2.0:oob
+      const localhostRedirectUri = redirect_uris.find(uri => uri.includes('localhost')) || redirect_uris[1] || 'http://localhost';
+      this.auth = new OAuth2Client(client_id, client_secret, localhostRedirectUri);
       
       // Check if we have a token
       if (fs.existsSync(TOKEN_PATH)) {
@@ -61,38 +64,125 @@ class GoogleCalendarService {
     });
   }
 
-  // Get authorization URL with local server for callback
+  // Get authorization URL with Cloudflare Worker for callback
   async getAuthUrlWithServer() {
     if (!this.auth) return { success: false, error: 'Auth not initialized' };
     
     try {
-      // Start local server to handle callback
-      const callbackServer = new OAuthCallbackServer();
-      await callbackServer.startServer();
+      // Generate unique session ID for this OAuth request
+      const sessionId = this.generateSessionId();
       
-      // Generate auth URL with localhost:3000 as redirect
+      // Use Cloudflare Worker as redirect URI
+      const redirectUri = 'https://meeting-recording.anushka-d22.workers.dev/oauth/callback';
+      
       const authUrl = this.auth.generateAuthUrl({
         access_type: 'offline',
         scope: SCOPES,
         prompt: 'consent',
-        redirect_uri: 'http://localhost:3000'
+        redirect_uri: redirectUri,
+        state: sessionId // Pass session ID to track this auth request
       });
+      
+      console.log(`🔗 Using Cloudflare redirect URI: ${redirectUri}`);
+      console.log(`🆔 Session ID: ${sessionId}`);
+      console.log(`🌐 Opening OAuth URL...`);
       
       return {
         success: true,
         authUrl,
-        waitForCode: () => callbackServer.waitForAuthCode()
+        sessionId,
+        redirectUri: redirectUri,
+        waitForCode: () => this.pollForTokens(sessionId)
       };
     } catch (error) {
-      console.error('Error setting up auth server:', error);
+      console.error('Error setting up Cloudflare OAuth:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Authorize with the code from Google
-  async authorize(code) {
+  // Generate unique session ID
+  generateSessionId() {
+    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  // Poll Cloudflare Worker for tokens
+  async pollForTokens(sessionId, timeout = 120000) {
+    const startTime = Date.now();
+    const pollInterval = 2000; // 2 seconds
+    
+    console.log(`🔄 Polling for tokens with session ID: ${sessionId}`);
+    
+    while ((Date.now() - startTime) < timeout) {
+      try {
+        const response = await fetch(`https://meeting-recording.anushka-d22.workers.dev/oauth/poll?session=${sessionId}`);
+        
+        if (response.ok && response.status === 200) {
+          const tokens = await response.json();
+          console.log('✅ Tokens received from Cloudflare!');
+          return tokens;
+        }
+        
+        if (response.status === 202) {
+          // Still pending, continue polling
+          console.log('⏳ Waiting for OAuth completion...');
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Polling failed');
+        }
+        
+        // Wait before next poll
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      } catch (error) {
+        console.error('Polling error:', error);
+        // Continue polling unless it's a critical error
+        if (error.message.includes('fetch')) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          continue;
+        }
+        throw error;
+      }
+    }
+    
+    throw new Error('OAuth timeout - user did not complete authorization');
+  }
+
+  // Authorize with tokens from Cloudflare
+  async authorizeWithTokens(tokens) {
     try {
+      console.log('🔑 Setting credentials with tokens from Cloudflare...');
+      
+      this.auth.setCredentials(tokens);
+      
+      // Save the token
+      fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
+      
+      this.calendar = google.calendar({ version: 'v3', auth: this.auth });
+      
+      console.log('✅ Google Calendar authorization successful!');
+      return true;
+    } catch (error) {
+      console.error('Error setting credentials:', error);
+      return false;
+    }
+  }
+
+  // Legacy method - Authorize with the code from Google (keeping for backward compatibility)
+  async authorize(code, redirectUri = null) {
+    try {
+      // If redirectUri is provided, temporarily update the OAuth2 client
+      const originalRedirectUri = this.auth.redirectUri;
+      if (redirectUri) {
+        this.auth.redirectUri = redirectUri;
+        console.log(`Using redirect URI for token exchange: ${redirectUri}`);
+      }
+      
       const { tokens } = await this.auth.getToken(code);
+      
+      // Restore original redirect URI
+      if (redirectUri) {
+        this.auth.redirectUri = originalRedirectUri;
+      }
+      
       this.auth.setCredentials(tokens);
       
       // Save the token
@@ -201,6 +291,12 @@ class GoogleCalendarService {
   // Revoke authorization
   async revokeAuth() {
     try {
+      // Clean up callback server if it exists
+      if (this.callbackServer) {
+        this.callbackServer.stopServer();
+        this.callbackServer = null;
+      }
+      
       if (fs.existsSync(TOKEN_PATH)) {
         fs.unlinkSync(TOKEN_PATH);
       }
